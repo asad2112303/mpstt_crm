@@ -1,0 +1,42 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Environments & secrets — never commit real values
+.env
+.env.*
+!.env.example
+!*/.env.example
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Local storage backend (dev file uploads)
+backend/var/
+# Supabase local
+supabase/.temp/
+supabase/.branches/
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/

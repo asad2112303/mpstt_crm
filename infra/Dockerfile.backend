@@ -1,0 +1,21 @@
+# MPSTT CRM backend image
+FROM python:3.11-slim AS base
+
+# WeasyPrint system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpango-1.0-0 libpangoft2-1.0-0 libgdk-pixbuf-2.0-0 libffi8 shared-mime-info fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+WORKDIR /srv/app
+COPY backend/pyproject.toml backend/uv.lock* ./
+RUN uv sync --frozen --no-dev || uv sync --no-dev
+
+COPY backend/app ./app
+COPY backend/alembic ./alembic
+COPY backend/alembic.ini ./
+
+EXPOSE 8000
+# Migrations are run as a separate deploy step: `uv run alembic upgrade head`
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,24 @@
+# Local development stack.
+# The database mirrors Supabase PostgreSQL for dev/test. In staging/production
+# the managed Supabase database + Auth + Storage are used instead.
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: mpstt-crm-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mpstt_crm
+    command: ["postgres", "-c", "timezone=UTC"]
+    ports:
+      - "54322:5432"
+    volumes:
+      - mpstt_crm_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mpstt_crm"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mpstt_crm_pgdata:
