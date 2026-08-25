@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import MetaData, func, text
+from sqlalchemy import DateTime, MetaData, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -17,6 +17,8 @@ NAMING_CONVENTION = {
 
 class Base(DeclarativeBase):
     metadata = MetaData(schema="crm", naming_convention=NAMING_CONVENTION)
+    # Every datetime column is timestamptz — the blueprint forbids naive timestamps.
+    type_annotation_map = {datetime: DateTime(timezone=True)}
 
 
 class UUIDPKMixin:
