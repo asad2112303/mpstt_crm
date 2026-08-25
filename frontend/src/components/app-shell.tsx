@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
+  Layers,
   LayoutDashboard,
   LogOut,
   Menu,
+  Package,
   Settings,
   ShieldCheck,
   Users,
@@ -42,6 +44,13 @@ export interface NavSection {
 export const NAV_SECTIONS: NavSection[] = [
   {
     items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+  },
+  {
+    title: "Catalogue",
+    items: [
+      { href: "/catalogue", label: "Products", icon: Package },
+      { href: "/catalogue/master", label: "Master data", icon: Layers, adminOnly: true },
+    ],
   },
   {
     title: "Administration",

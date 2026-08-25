@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    Index,
     Integer,
     SmallInteger,
     String,
@@ -81,6 +82,10 @@ class AuditLog(Base):
     """Append-only audit trail. A DB trigger rejects UPDATE/DELETE."""
 
     __tablename__ = "audit_log"
+    __table_args__ = (
+        Index("ix_audit_log_entity", "entity_type", "entity_id"),
+        Index("ix_audit_log_created_at", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
