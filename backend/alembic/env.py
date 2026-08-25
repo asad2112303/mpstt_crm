@@ -1,8 +1,8 @@
 """Alembic environment.
 
 Uses a synchronous psycopg connection derived from DATABASE_URL.
-All application tables live in the ``crm`` schema; the alembic version table
-does too, so the ``public`` schema stays untouched.
+All application tables live in the ``crm`` schema. The alembic version table
+stays in ``public`` so a full downgrade (which drops the crm schema) works.
 """
 import os
 from logging.config import fileConfig
@@ -33,7 +33,6 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        version_table_schema="crm",
         include_schemas=True,
     )
     with context.begin_transaction():
@@ -48,8 +47,7 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            version_table_schema="crm",
-            include_schemas=True,
+                include_schemas=True,
         )
         with context.begin_transaction():
             context.run_migrations()
