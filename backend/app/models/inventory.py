@@ -56,7 +56,8 @@ class StockReservation(Base, UUIDPKMixin):
     __tablename__ = "stock_reservations"
     __table_args__ = (
         CheckConstraint(f"status IN {RESERVATION_STATUSES!r}", name="status_valid"),
-        CheckConstraint("quantity > 0", name="quantity_positive"),
+        # Remaining reserved amount; reaches 0 when fully fulfilled.
+        CheckConstraint("quantity >= 0", name="quantity_positive"),
         Index("ix_reservations_order_item", "sales_order_item_id", "status"),
     )
 

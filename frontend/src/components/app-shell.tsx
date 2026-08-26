@@ -18,6 +18,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
+  Truck,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -66,6 +67,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Operations",
     items: [
       { href: "/inventory", label: "Inventory", icon: Boxes },
+      { href: "/deliveries", label: "Deliveries", icon: Truck },
       { href: "/invoices", label: "Invoices", icon: Receipt },
     ],
   },

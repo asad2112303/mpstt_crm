@@ -2,6 +2,7 @@
 from app.models import (  # noqa: F401
     access,
     catalogue,
+    deliveries,
     documents,
     inventory,
     invoices,

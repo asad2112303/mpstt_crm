@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+{# Delivery challan — quantities only, no prices. MPSTT visual system. #}
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @page {
+    size: A4;
+    margin: 12mm 14mm 24mm 14mm;
+    background: url("v1/assets/mpstt-wave.png") no-repeat bottom center;
+    background-size: 100% auto;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "Poppins", "DejaVu Sans", sans-serif; font-size: 9.5pt; color: #263238; margin: 0; }
+  .header { display: flex; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 10pt; }
+  .brand img { width: 21mm; height: auto; }
+  .brand-title { font-size: 20pt; font-weight: 700; color: #087F74; line-height: 1; }
+  .brand-sub { font-size: 8pt; font-weight: 600; color: #075E59; margin-top: 3pt; }
+  .qpanel { background: #087F74; color: #FFF; border-radius: 5pt; padding: 8pt 12pt; min-width: 62mm; }
+  .qpanel .qtitle { font-size: 14pt; font-weight: 700; letter-spacing: 0.06em; }
+  .qpanel .qsub { font-size: 8.5pt; color: #7BCBB8; margin-bottom: 5pt; }
+  .qmeta { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  .qmeta td { padding: 1.5pt 0; }
+  .qmeta td.label { color: #7BCBB8; padding-right: 8pt; white-space: nowrap; }
+  .qmeta td.value { color: #FFF; font-weight: 600; text-align: right; }
+  .party-box { border: 0.8pt solid #EAF4F2; border-radius: 5pt; overflow: hidden; margin-top: 10pt; }
+  .party-box h4 { margin: 0; background: #087F74; color: #FFF; font-size: 8pt; padding: 4pt 8pt; letter-spacing: 0.1em; }
+  .party-body { background: #F7FAF9; padding: 6pt 8pt; font-size: 9pt; }
+  table.items { width: 100%; border-collapse: collapse; margin-top: 10pt; }
+  table.items th { background: #087F74; color: #FFF; font-size: 8.5pt; padding: 5pt 6pt; text-align: left; }
+  table.items th.num, table.items td.num { text-align: right; }
+  table.items td { padding: 6pt; border-bottom: 0.6pt solid #EAF4F2; font-size: 9pt; }
+  table.items tr:nth-child(even) td { background: #F5F9F8; }
+  .sig-grid { display: flex; gap: 8pt; margin-top: 24pt; page-break-inside: avoid; }
+  .sig-box { flex: 1; border: 0.8pt solid #EAF4F2; border-radius: 5pt; padding: 8pt 10pt; font-size: 8.5pt; }
+  .sig-box .title { font-weight: 700; color: #075E59; }
+  .sig-line { border-top: 0.8pt solid #263238; margin-top: 26pt; padding-top: 2pt; }
+  .note { margin-top: 10pt; font-size: 7.8pt; color: #6B7474; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <img src="v1/assets/mpstt-logo.png" alt="MPSTT logo">
+      <div>
+        <div class="brand-title">MPSTT</div>
+        <div class="brand-sub">MEDICAL PRISM SUPPLIES FOR<br>TREATMENT AND TECHNOLOGY</div>
+      </div>
+    </div>
+    <div class="qpanel">
+      <div class="qtitle">DELIVERY CHALLAN</div>
+      <div class="qsub">Goods Dispatch Note</div>
+      <table class="qmeta">
+        <tr><td class="label">Challan No</td><td class="value">{{ challan.number }}</td></tr>
+        <tr><td class="label">Date</td><td class="value">{{ challan.date }}</td></tr>
+        <tr><td class="label">Order Ref</td><td class="value">{{ challan.order_number }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="party-box">
+    <h4>DELIVER TO</h4>
+    <div class="party-body">
+      <strong>{{ customer.name }}</strong>
+      {% if customer.city %} · {{ customer.city }}{% endif %}
+      {% if customer.phone %} · {{ customer.phone }}{% endif %}
+      {% if challan.delivery_person %}<br>Delivered by: {{ challan.delivery_person }}{% endif %}
+      {% if challan.vehicle %} · Vehicle: {{ challan.vehicle }}{% endif %}
+    </div>
+  </div>
+
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:8%">No.</th>
+        <th style="width:62%">Product / Specification</th>
+        <th style="width:14%">Unit</th>
+        <th class="num" style="width:16%">Quantity</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>{{ item.sn }}</td>
+        <td>{{ item.description }}</td>
+        <td>{{ item.uom }}</td>
+        <td class="num">{{ item.quantity }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="sig-grid">
+    <div class="sig-box">
+      <div class="title">Dispatched by (MPSTT)</div>
+      <div class="sig-line">Signature</div>
+    </div>
+    <div class="sig-box">
+      <div class="title">Received by</div>
+      {% if pod.receiver_name %}
+        {{ pod.receiver_name }}{% if pod.receiver_designation %} — {{ pod.receiver_designation }}{% endif %}<br>
+        {{ pod.received_at }}
+      {% endif %}
+      <div class="sig-line">Signature / Stamp</div>
+    </div>
+  </div>
+
+  <div class="note">
+    This challan evidences physical delivery only. Amounts owed are stated on
+    the tax invoice.
+  </div>
+</body>
+</html>
