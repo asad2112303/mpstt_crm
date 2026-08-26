@@ -21,6 +21,7 @@ import {
   Settings,
   ShieldCheck,
   Truck,
+  UploadCloud,
   Users,
   Wallet,
   type LucideIcon,
@@ -96,6 +97,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/admin/users", label: "Users", icon: Users, adminOnly: true },
       { href: "/admin/settings", label: "Settings", icon: Settings, adminOnly: true },
       { href: "/admin/audit", label: "Audit log", icon: ScrollText, adminOnly: true },
+      { href: "/admin/imports", label: "Data import", icon: UploadCloud, adminOnly: true },
     ],
   },
 ];

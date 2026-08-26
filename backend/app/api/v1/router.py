@@ -8,6 +8,7 @@ from app.api.v1 import (
     customers,
     deliveries,
     documents,
+    imports,
     inventory,
     invoices,
     orders,
@@ -35,3 +36,4 @@ api_router.include_router(invoices.router)
 api_router.include_router(deliveries.router)
 api_router.include_router(payments.router)
 api_router.include_router(reports.router)
+api_router.include_router(imports.router)

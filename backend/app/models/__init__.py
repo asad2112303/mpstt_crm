@@ -4,6 +4,7 @@ from app.models import (  # noqa: F401
     catalogue,
     deliveries,
     documents,
+    imports,
     inventory,
     invoices,
     orders,
