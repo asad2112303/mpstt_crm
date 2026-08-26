@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
   Banknote,
+  BarChart3,
   BellRing,
   Boxes,
   Building2,
@@ -33,6 +34,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { GlobalSearch } from "@/components/global-search";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-context";
@@ -78,6 +80,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/payments", label: "Payments", icon: Banknote },
       { href: "/receivables", label: "Receivables", icon: Wallet },
+      { href: "/reports", label: "Reports", icon: BarChart3 },
     ],
   },
   {
@@ -230,7 +233,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               <NavLinks onNavigate={() => setMobileOpen(false)} />
             </SheetContent>
           </Sheet>
-          <div className="flex-1" />
+          <div className="flex flex-1 justify-center">
+            <GlobalSearch />
+          </div>
           <UserMenu />
         </header>
 
