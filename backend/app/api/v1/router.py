@@ -12,6 +12,7 @@ from app.api.v1 import (
     invoices,
     orders,
     organizations,
+    payments,
     prospects,
     quotations,
     settings,
@@ -31,3 +32,4 @@ api_router.include_router(orders.router)
 api_router.include_router(inventory.router)
 api_router.include_router(invoices.router)
 api_router.include_router(deliveries.router)
+api_router.include_router(payments.router)

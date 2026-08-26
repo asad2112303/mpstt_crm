@@ -8,6 +8,7 @@ from app.models import (  # noqa: F401
     invoices,
     orders,
     organization,
+    payments,
     quotes,
 )
 from app.models.base import Base  # noqa: F401

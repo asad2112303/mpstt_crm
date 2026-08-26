@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
+  Banknote,
   BellRing,
   Boxes,
   Building2,
@@ -20,6 +21,7 @@ import {
   ShieldCheck,
   Truck,
   Users,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -69,6 +71,13 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/inventory", label: "Inventory", icon: Boxes },
       { href: "/deliveries", label: "Deliveries", icon: Truck },
       { href: "/invoices", label: "Invoices", icon: Receipt },
+    ],
+  },
+  {
+    title: "Finance",
+    items: [
+      { href: "/payments", label: "Payments", icon: Banknote },
+      { href: "/receivables", label: "Receivables", icon: Wallet },
     ],
   },
   {

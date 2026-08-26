@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+{# Payment receipt — MPSTT visual system. #}
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @page {
+    size: A5 landscape;
+    margin: 10mm 12mm 16mm 12mm;
+    background: url("v1/assets/mpstt-wave.png") no-repeat bottom center;
+    background-size: 100% auto;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "Poppins", "DejaVu Sans", sans-serif; font-size: 9.5pt; color: #263238; margin: 0; }
+  .header { display: flex; justify-content: space-between; align-items: center; }
+  .brand { display: flex; align-items: center; gap: 8pt; }
+  .brand img { width: 16mm; height: auto; }
+  .brand-title { font-size: 15pt; font-weight: 700; color: #087F74; }
+  .brand-sub { font-size: 6.8pt; font-weight: 600; color: #075E59; }
+  .rpanel { background: #087F74; color: #FFF; border-radius: 5pt; padding: 6pt 10pt; text-align: right; }
+  .rpanel .title { font-size: 12pt; font-weight: 700; letter-spacing: 0.08em; }
+  .rpanel .meta { font-size: 8pt; color: #7BCBB8; }
+  .box { border: 0.8pt solid #EAF4F2; border-radius: 5pt; background: #F7FAF9; padding: 8pt 10pt; margin-top: 8pt; }
+  table.detail { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  table.detail td { padding: 2.5pt 4pt; }
+  table.detail td.label { color: #6B7474; width: 30%; }
+  .amount-band {
+    display: flex; justify-content: space-between; background: #075E59; color: #FFF;
+    border-radius: 4pt; padding: 6pt 10pt; margin-top: 8pt; font-weight: 700;
+  }
+  .allocs { margin-top: 6pt; font-size: 8pt; color: #6B7474; }
+  .sig { margin-top: 16pt; text-align: right; font-size: 8.5pt; }
+  .sig-line { border-top: 0.8pt solid #263238; display: inline-block; min-width: 45mm; padding-top: 2pt; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <img src="v1/assets/mpstt-logo.png" alt="MPSTT logo">
+      <div>
+        <div class="brand-title">MPSTT</div>
+        <div class="brand-sub">MEDICAL PRISM SUPPLIES FOR TREATMENT AND TECHNOLOGY</div>
+      </div>
+    </div>
+    <div class="rpanel">
+      <div class="title">RECEIPT</div>
+      <div class="meta">{{ receipt.number }} · {{ receipt.date }}</div>
+    </div>
+  </div>
+
+  <div class="box">
+    <table class="detail">
+      <tr><td class="label">Received from</td><td><strong>{{ customer.name }}</strong>{% if customer.city %} · {{ customer.city }}{% endif %}</td></tr>
+      <tr><td class="label">Payment</td><td>{{ payment.number }} · {{ payment.date }}</td></tr>
+      <tr><td class="label">Method</td><td>{{ payment.method }}{% if payment.reference %} · Ref: {{ payment.reference }}{% endif %}</td></tr>
+    </table>
+  </div>
+
+  <div class="amount-band">
+    <span>AMOUNT RECEIVED</span>
+    <span>{{ receipt.currency }} {{ payment.amount | money }}</span>
+  </div>
+
+  {% if allocations %}
+  <div class="allocs">
+    Applied to:
+    {% for a in allocations %}{{ a.number }} ({{ a.amount | money }}){% if not loop.last %}, {% endif %}{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="sig">
+    <span class="sig-line">For MPSTT — Authorized Signature</span>
+  </div>
+</body>
+</html>
