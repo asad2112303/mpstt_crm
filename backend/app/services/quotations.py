@@ -96,7 +96,14 @@ async def pdf_context(session: AsyncSession, quote: Quotation, company: dict) ->
     org = await session.get(Organization, quote.organization_id)
     branch = await session.get(OrganizationBranch, quote.branch_id) if quote.branch_id else None
     contact = await session.get(OrganizationContact, quote.contact_id) if quote.contact_id else None
+    prepared_by = None
+    if quote.created_by:
+        from app.models.access import UserProfile
+
+        creator = await session.get(UserProfile, quote.created_by)
+        prepared_by = creator.full_name if creator else None
     return {
+        "prepared_by": prepared_by,
         "company": company,
         "quote": {
             "number": quote.quotation_number,
