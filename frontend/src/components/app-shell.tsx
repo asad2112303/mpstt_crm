@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   Package,
+  Receipt,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -63,7 +64,10 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: "Operations",
-    items: [{ href: "/inventory", label: "Inventory", icon: Boxes }],
+    items: [
+      { href: "/inventory", label: "Inventory", icon: Boxes },
+      { href: "/invoices", label: "Invoices", icon: Receipt },
+    ],
   },
   {
     title: "Catalogue",

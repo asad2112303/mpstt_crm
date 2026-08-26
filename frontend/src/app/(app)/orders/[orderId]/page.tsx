@@ -37,6 +37,19 @@ export default function OrderDetailPage({
     enabled: Boolean(order),
   });
 
+  const createInvoice = useMutation({
+    mutationFn: () =>
+      api<{ id: string }>("/api/v1/invoices/from-order", {
+        method: "POST",
+        body: { sales_order_id: orderId },
+      }),
+    onSuccess: (resp) => {
+      toast.success("Draft invoice created");
+      window.location.href = `/invoices/${resp.data.id}`;
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
+  });
+
   const act = useMutation({
     mutationFn: ({ action, body, idem }: { action: string; body?: unknown; idem?: boolean }) =>
       api(`/api/v1/orders/${orderId}/${action}`, {
@@ -97,6 +110,12 @@ export default function OrderDetailPage({
               <Button size="sm" variant="outline" disabled={act.isPending}
                 onClick={() => act.mutate({ action: "mark-ready" })}>
                 Mark ready
+              </Button>
+            )}
+            {!["draft", "cancelled"].includes(s) && (
+              <Button size="sm" variant="outline" disabled={createInvoice.isPending}
+                onClick={() => createInvoice.mutate()}>
+                Create invoice
               </Button>
             )}
             {["draft", "confirmed", "preparing", "ready"].includes(s) && (
