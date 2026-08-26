@@ -40,3 +40,6 @@ supabase/.branches/
 # Playwright
 frontend/test-results/
 frontend/playwright-report/
+
+# Migration source workbook (business data archive — never commit)
+MPSTT_CRM/
