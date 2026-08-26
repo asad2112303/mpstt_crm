@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
+  BellRing,
+  Building2,
   Layers,
   LayoutDashboard,
   LogOut,
@@ -44,6 +46,13 @@ export interface NavSection {
 export const NAV_SECTIONS: NavSection[] = [
   {
     items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+  },
+  {
+    title: "Sales",
+    items: [
+      { href: "/prospects", label: "Prospects", icon: Building2 },
+      { href: "/follow-ups", label: "Follow-ups", icon: BellRing },
+    ],
   },
   {
     title: "Catalogue",
