@@ -7,6 +7,8 @@ from app.api.v1 import (
     catalogue,
     customers,
     documents,
+    inventory,
+    orders,
     organizations,
     prospects,
     quotations,
@@ -23,3 +25,5 @@ api_router.include_router(customers.router)
 api_router.include_router(documents.router)
 api_router.include_router(settings.router)
 api_router.include_router(quotations.router)
+api_router.include_router(orders.router)
+api_router.include_router(inventory.router)

@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
   BellRing,
+  Boxes,
   Building2,
+  ClipboardList,
   FileText,
   Layers,
   LayoutDashboard,
@@ -55,8 +57,13 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/prospects", label: "Prospects", icon: Building2 },
       { href: "/customers", label: "Customers", icon: Users },
       { href: "/quotations", label: "Quotations", icon: FileText },
+      { href: "/orders", label: "Orders", icon: ClipboardList },
       { href: "/follow-ups", label: "Follow-ups", icon: BellRing },
     ],
+  },
+  {
+    title: "Operations",
+    items: [{ href: "/inventory", label: "Inventory", icon: Boxes }],
   },
   {
     title: "Catalogue",
