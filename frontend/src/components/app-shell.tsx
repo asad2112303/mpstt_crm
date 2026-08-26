@@ -169,7 +169,15 @@ function UserMenu() {
   const { me, isLoading, signOut } = useAuth();
 
   if (isLoading) return <Skeleton className="h-9 w-32" />;
-  if (!me) return null;
+  // No profile loaded (not signed in, or session without a CRM profile):
+  // still offer a way out of the session.
+  if (!me)
+    return (
+      <Button variant="outline" size="sm" onClick={() => void signOut()}>
+        <LogOut className="mr-1.5 h-4 w-4" aria-hidden />
+        Sign out
+      </Button>
+    );
 
   const initials = me.full_name
     .split(/\s+/)
@@ -208,7 +216,7 @@ function UserMenu() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { error } = useAuth();
+  const { error, signOut } = useAuth();
 
   return (
     <div className="flex min-h-dvh w-full">
@@ -250,8 +258,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                   : "Your session is no longer valid."}
               </p>
               <p className="text-sm text-muted-foreground">{error.message}</p>
-              <Button variant="outline" render={<Link href="/login" />}>
-                Back to sign in
+              <Button onClick={() => void signOut()}>
+                <LogOut className="mr-1.5 h-4 w-4" aria-hidden />
+                Sign out
               </Button>
             </div>
           ) : (
