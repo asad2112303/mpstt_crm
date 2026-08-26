@@ -37,6 +37,21 @@ function CategoriesTab() {
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
   });
 
+  const patchCat = useMutation({
+    mutationFn: ({ cat, changes }: { cat: Category; changes: Partial<Category> }) =>
+      api(`/api/v1/catalogue/categories/${cat.id}`, {
+        method: "PATCH",
+        body: {
+          name: changes.name ?? cat.name,
+          description: cat.description,
+          attribute_schema: cat.attribute_schema,
+          is_active: changes.is_active ?? cat.is_active,
+        },
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["catalogue"] }),
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
+  });
+
   if (isLoading) return <Skeleton className="h-48 w-full" />;
   return (
     <div className="space-y-4">
@@ -51,6 +66,7 @@ function CategoriesTab() {
               <TableHead>Category</TableHead>
               <TableHead>Specifications defined</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -64,6 +80,19 @@ function CategoriesTab() {
                   <Badge variant={c.is_active ? "outline" : "destructive"}>
                     {c.is_active ? "Active" : "Inactive"}
                   </Badge>
+                </TableCell>
+                <TableCell className="space-x-1 text-right">
+                  <Button variant="ghost" size="sm"
+                    onClick={() => {
+                      const name = window.prompt("Category name:", c.name);
+                      if (name) patchCat.mutate({ cat: c, changes: { name } });
+                    }}>
+                    Rename
+                  </Button>
+                  <Button variant="ghost" size="sm"
+                    onClick={() => patchCat.mutate({ cat: c, changes: { is_active: !c.is_active } })}>
+                    {c.is_active ? "Deactivate" : "Activate"}
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -89,6 +118,21 @@ function BrandsTab() {
         searchParams: { include_inactive: true },
       })).data,
   });
+  const patchBrand = useMutation({
+    mutationFn: ({ brand, changes }: { brand: Brand; changes: Partial<Brand> }) =>
+      api(`/api/v1/catalogue/brands/${brand.id}`, {
+        method: "PATCH",
+        body: {
+          name: changes.name ?? brand.name,
+          manufacturer: brand.manufacturer,
+          country_of_origin: brand.country_of_origin,
+          is_active: changes.is_active ?? brand.is_active,
+        },
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["catalogue", "brands"] }),
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
+  });
+
   const create = useMutation({
     mutationFn: () => api("/api/v1/catalogue/brands", { method: "POST", body: { name } }),
     onSuccess: () => {
@@ -112,7 +156,10 @@ function BrandsTab() {
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
         <Table>
           <TableHeader>
-            <TableRow><TableHead>Brand</TableHead><TableHead>Status</TableHead></TableRow>
+            <TableRow>
+              <TableHead>Brand</TableHead><TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
           </TableHeader>
           <TableBody>
             {(data ?? []).map((b) => (
@@ -122,6 +169,19 @@ function BrandsTab() {
                   <Badge variant={b.is_active ? "outline" : "destructive"}>
                     {b.is_active ? "Active" : "Inactive"}
                   </Badge>
+                </TableCell>
+                <TableCell className="space-x-1 text-right">
+                  <Button variant="ghost" size="sm"
+                    onClick={() => {
+                      const newName = window.prompt("Brand name:", b.name);
+                      if (newName) patchBrand.mutate({ brand: b, changes: { name: newName } });
+                    }}>
+                    Rename
+                  </Button>
+                  <Button variant="ghost" size="sm"
+                    onClick={() => patchBrand.mutate({ brand: b, changes: { is_active: !b.is_active } })}>
+                    {b.is_active ? "Deactivate" : "Activate"}
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -142,6 +202,22 @@ function UomsTab() {
         searchParams: { include_inactive: true },
       })).data,
   });
+  const patchUom = useMutation({
+    mutationFn: ({ uom, changes }: { uom: Uom; changes: Partial<Uom> }) =>
+      api(`/api/v1/catalogue/uoms/${uom.id}`, {
+        method: "PATCH",
+        body: {
+          code: uom.code,
+          name: changes.name ?? uom.name,
+          category: uom.category,
+          decimal_scale: uom.decimal_scale,
+          is_active: changes.is_active ?? uom.is_active,
+        },
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["catalogue", "uoms"] }),
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
+  });
+
   const create = useMutation({
     mutationFn: () => api("/api/v1/catalogue/uoms", { method: "POST", body: form }),
     onSuccess: () => {
@@ -171,6 +247,7 @@ function UomsTab() {
             <TableRow>
               <TableHead>Code</TableHead><TableHead>Name</TableHead>
               <TableHead>Decimals</TableHead><TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -183,6 +260,19 @@ function UomsTab() {
                   <Badge variant={u.is_active ? "outline" : "destructive"}>
                     {u.is_active ? "Active" : "Inactive"}
                   </Badge>
+                </TableCell>
+                <TableCell className="space-x-1 text-right">
+                  <Button variant="ghost" size="sm"
+                    onClick={() => {
+                      const newName = window.prompt("Unit name:", u.name);
+                      if (newName) patchUom.mutate({ uom: u, changes: { name: newName } });
+                    }}>
+                    Rename
+                  </Button>
+                  <Button variant="ghost" size="sm"
+                    onClick={() => patchUom.mutate({ uom: u, changes: { is_active: !u.is_active } })}>
+                    {u.is_active ? "Deactivate" : "Activate"}
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

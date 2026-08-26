@@ -5,6 +5,7 @@ Supabase access token as a Bearer header. We verify it (HS256 legacy secret or
 the project JWKS), then load ``crm.user_profiles`` — an inactive or missing
 profile is rejected even with a valid token.
 """
+import logging
 import time
 from dataclasses import dataclass
 
@@ -101,6 +102,10 @@ async def get_current_user(
         await db.execute(select(UserProfile).where(UserProfile.id == sub))
     ).scalar_one_or_none()
     if profile is None:
+        # Operational aid: bootstrap needs this id to create the first profile.
+        logging.getLogger("app.auth").warning(
+            "NO_PROFILE for auth user sub=%s email=%s", sub, claims.get("email")
+        )
         raise AuthorizationError("No CRM profile exists for this account.", code="NO_PROFILE")
     if not profile.is_active:
         raise AuthorizationError("This account has been deactivated.", code="ACCOUNT_DISABLED")

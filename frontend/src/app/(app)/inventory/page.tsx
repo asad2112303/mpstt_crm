@@ -277,6 +277,20 @@ function MovementsTab() {
 function WarehousesTab({ warehouses }: { warehouses: WarehouseRow[] }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ code: "", name: "", address: "" });
+  const patchWh = useMutation({
+    mutationFn: ({ wh, changes }: { wh: WarehouseRow; changes: Partial<WarehouseRow> }) =>
+      api(`/api/v1/inventory/warehouses/${wh.id}`, {
+        method: "PATCH",
+        body: {
+          code: wh.code,
+          name: changes.name ?? wh.name,
+          address: changes.address !== undefined ? changes.address : wh.address,
+          is_active: changes.is_active ?? wh.is_active,
+        },
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["inventory"] }),
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
+  });
   const create = useMutation({
     mutationFn: () =>
       api("/api/v1/inventory/warehouses", {
@@ -320,6 +334,7 @@ function WarehousesTab({ warehouses }: { warehouses: WarehouseRow[] }) {
             <TableRow>
               <TableHead>Code</TableHead><TableHead>Name</TableHead>
               <TableHead>Address</TableHead><TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -332,6 +347,19 @@ function WarehousesTab({ warehouses }: { warehouses: WarehouseRow[] }) {
                   <Badge variant={w.is_active ? "outline" : "destructive"}>
                     {w.is_active ? "Active" : "Inactive"}
                   </Badge>
+                </TableCell>
+                <TableCell className="space-x-1 text-right">
+                  <Button variant="ghost" size="sm"
+                    onClick={() => {
+                      const newName = window.prompt("Warehouse name:", w.name);
+                      if (newName) patchWh.mutate({ wh: w, changes: { name: newName } });
+                    }}>
+                    Rename
+                  </Button>
+                  <Button variant="ghost" size="sm"
+                    onClick={() => patchWh.mutate({ wh: w, changes: { is_active: !w.is_active } })}>
+                    {w.is_active ? "Deactivate" : "Activate"}
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

@@ -11,6 +11,7 @@ import {
   type Organization, type ProspectStage,
 } from "@/lib/types/crm";
 import { ConvertDialog } from "@/components/convert-dialog";
+import { EditOrganizationDialog } from "@/components/edit-org-dialog";
 import {
   ActivitiesTab, BranchesTab, ContactsTab, PricesTab, SamplesTab, TasksTab,
 } from "@/components/org-tabs";
@@ -53,7 +54,10 @@ function OverviewTab({ org }: { org: Organization }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
-        <CardHeader><CardTitle className="text-base">Identity</CardTitle></CardHeader>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle className="text-base">Identity</CardTitle>
+          <EditOrganizationDialog org={org} />
+        </CardHeader>
         <CardContent className="space-y-1.5 text-sm">
           <p><span className="text-muted-foreground">Code:</span> {org.org_code}</p>
           <p><span className="text-muted-foreground">Type:</span> {ORG_TYPE_LABELS[org.org_type]}</p>

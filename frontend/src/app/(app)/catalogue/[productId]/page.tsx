@@ -111,6 +111,77 @@ function VariantDialog({
   );
 }
 
+function EditProductDialog({ product }: { product: Product }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    name: product.name,
+    description: product.description ?? "",
+    tax_rate: product.tax_rate,
+    is_active: product.is_active,
+  });
+
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/api/v1/catalogue/products/${product.id}`, {
+        method: "PATCH",
+        body: {
+          name: form.name,
+          description: form.description || null,
+          tax_rate: form.tax_rate,
+          is_active: form.is_active,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Product updated");
+      queryClient.invalidateQueries({ queryKey: ["catalogue"] });
+      setOpen(false);
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Update failed"),
+  });
+
+  return (
+    <>
+      <Button variant="outline" onClick={() => setOpen(true)}>Edit product</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit {product.sku}</DialogTitle></DialogHeader>
+          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+            <div className="space-y-1.5">
+              <Label htmlFor="ep-name">Name *</Label>
+              <Input id="ep-name" required minLength={2} value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ep-desc">Description</Label>
+              <Input id="ep-desc" value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 items-end gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="ep-tax">Tax rate %</Label>
+                <Input id="ep-tax" type="number" min="0" max="100" step="0.01"
+                  value={form.tax_rate}
+                  onChange={(e) => setForm({ ...form, tax_rate: e.target.value })} />
+              </div>
+              <label className="flex items-center gap-2 pb-2 text-sm">
+                <input type="checkbox" checked={form.is_active}
+                  onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
+                Active
+              </label>
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={!form.name || save.isPending}>
+                {save.isPending ? "Saving…" : "Save changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export default function ProductDetailPage({
   params,
 }: {
@@ -165,9 +236,12 @@ export default function ProductDetailPage({
         title={product.name}
         description={`SKU ${product.sku} · ${category?.name ?? ""} · Tax ${product.tax_rate}%`}
         actions={
-          <Button onClick={() => { setDialogVariant(null); setDialogOpen(true); }}>
-            <Plus className="mr-1 h-4 w-4" aria-hidden /> New variant
-          </Button>
+          <div className="flex items-center gap-2">
+            <EditProductDialog product={product} />
+            <Button onClick={() => { setDialogVariant(null); setDialogOpen(true); }}>
+              <Plus className="mr-1 h-4 w-4" aria-hidden /> New variant
+            </Button>
+          </div>
         }
       />
 

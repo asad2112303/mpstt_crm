@@ -232,3 +232,55 @@ async def test_manual_status_guards(client, user_headers, admin_headers, db_sess
     resp = await client.post(f"/api/v1/orders/{order['id']}/mark-ready", headers=user_headers)
     assert resp.status_code == 200
     assert resp.json()["data"]["status"] == "ready"
+
+
+async def test_draft_order_editable_until_confirmed(client, user_headers, admin_headers, db_session):
+    variant = await make_sellable_variant(client, db_session)
+    wh = await ensure_warehouse(client, admin_headers)
+    await stock_up(client, admin_headers, wh["id"], variant["id"], "500")
+    data = await make_customer_with_order(client, user_headers, db_session, variant["id"])
+    order = data["order"]
+
+    # Draft: items/qty editable, totals recalculated server-side.
+    resp = await client.put(
+        f"/api/v1/orders/{order['id']}", headers=user_headers,
+        json={"customer_po_number": "PO-EDITED",
+              "items": [{"product_variant_id": variant["id"], "quantity": "10",
+                         "unit_price": "100.00", "discount_percent": "0"}]},
+    )
+    assert resp.status_code == 200, resp.text
+    edited = resp.json()["data"]
+    assert edited["customer_po_number"] == "PO-EDITED"
+    assert edited["grand_total"] == "1180.00"  # 1000 + 18% tax
+    assert len(edited["items"]) == 1
+
+    # Confirmed: frozen.
+    resp = await client.post(
+        f"/api/v1/orders/{order['id']}/confirm",
+        headers={**user_headers, "Idempotency-Key": str(uuid.uuid4())}, json={},
+    )
+    assert resp.status_code == 200
+    resp = await client.put(
+        f"/api/v1/orders/{order['id']}", headers=user_headers,
+        json={"notes": "tamper"},
+    )
+    assert resp.status_code == 409
+    assert resp.json()["error"]["code"] == "ORDER_NOT_DRAFT"
+
+
+async def test_warehouse_editable_by_admin(client, user_headers, admin_headers):
+    wh = await ensure_warehouse(client, admin_headers)
+    resp = await client.patch(
+        f"/api/v1/inventory/warehouses/{wh['id']}", headers=admin_headers,
+        json={"code": wh["code"], "name": "Renamed Warehouse", "address": "New address",
+              "is_active": True},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["name"] == "Renamed Warehouse"
+
+    # Operational user cannot edit warehouses.
+    resp = await client.patch(
+        f"/api/v1/inventory/warehouses/{wh['id']}", headers=user_headers,
+        json={"code": wh["code"], "name": "X", "is_active": True},
+    )
+    assert resp.status_code == 403

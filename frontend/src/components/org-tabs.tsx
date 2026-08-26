@@ -74,25 +74,42 @@ export function ContactsTab({ orgId }: { orgId: string }) {
     queryFn: async () => (await api<Contact[]>(`/api/v1/organizations/${orgId}/contacts`)).data,
   });
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ full_name: "", designation: "", phone_primary: "", email: "", whatsapp: "" });
+  const [editing, setEditing] = useState<Contact | null>(null);
+  const empty = { full_name: "", designation: "", phone_primary: "", email: "", whatsapp: "" };
+  const [form, setForm] = useState(empty);
 
-  const create = useMutation({
-    mutationFn: () =>
-      api(`/api/v1/organizations/${orgId}/contacts`, {
-        method: "POST",
-        body: {
-          full_name: form.full_name,
-          designation: form.designation || null,
-          phone_primary: form.phone_primary || null,
-          email: form.email || null,
-          whatsapp: form.whatsapp || null,
-        },
-      }),
+  function openFor(contact: Contact | null) {
+    setEditing(contact);
+    setForm(contact ? {
+      full_name: contact.full_name,
+      designation: contact.designation ?? "",
+      phone_primary: contact.phone_primary ?? "",
+      email: contact.email ?? "",
+      whatsapp: contact.whatsapp ?? "",
+    } : empty);
+    setOpen(true);
+  }
+
+  const save = useMutation({
+    mutationFn: () => {
+      const body = {
+        full_name: form.full_name,
+        designation: form.designation || null,
+        phone_primary: form.phone_primary || null,
+        email: form.email || null,
+        whatsapp: form.whatsapp || null,
+        branch_id: editing?.branch_id ?? null,
+        is_primary: editing?.is_primary ?? false,
+        is_active: editing?.is_active ?? true,
+      };
+      return editing
+        ? api(`/api/v1/organizations/contacts/${editing.id}`, { method: "PATCH", body })
+        : api(`/api/v1/organizations/${orgId}/contacts`, { method: "POST", body });
+    },
     onSuccess: () => {
-      toast.success("Contact added");
+      toast.success(editing ? "Contact updated" : "Contact added");
       queryClient.invalidateQueries({ queryKey: ["org", orgId, "contacts"] });
       setOpen(false);
-      setForm({ full_name: "", designation: "", phone_primary: "", email: "", whatsapp: "" });
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
   });
@@ -100,13 +117,15 @@ export function ContactsTab({ orgId }: { orgId: string }) {
   if (isLoading) return <Skeleton className="h-40 w-full" />;
   return (
     <div className="space-y-3">
+      <Button variant="outline" size="sm" onClick={() => openFor(null)}>
+        <Plus className="mr-1 h-3.5 w-3.5" aria-hidden /> Add contact
+      </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-card px-3 text-sm hover:bg-muted">
-          <Plus className="h-3.5 w-3.5" aria-hidden /> Add contact
-        </DialogTrigger>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add contact</DialogTitle></DialogHeader>
-          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
+          <DialogHeader>
+            <DialogTitle>{editing ? `Edit ${editing.full_name}` : "Add contact"}</DialogTitle>
+          </DialogHeader>
+          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
             {(
               [
                 ["full_name", "Full name *"],
@@ -124,7 +143,9 @@ export function ContactsTab({ orgId }: { orgId: string }) {
               </div>
             ))}
             <DialogFooter>
-              <Button type="submit" disabled={!form.full_name || create.isPending}>Save</Button>
+              <Button type="submit" disabled={!form.full_name || save.isPending}>
+                {save.isPending ? "Saving…" : "Save"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -139,6 +160,7 @@ export function ContactsTab({ orgId }: { orgId: string }) {
                 <TableHead>Name</TableHead><TableHead>Designation</TableHead>
                 <TableHead>Phone</TableHead><TableHead>WhatsApp</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -151,6 +173,9 @@ export function ContactsTab({ orgId }: { orgId: string }) {
                   <TableCell>{c.phone_primary ?? "—"}</TableCell>
                   <TableCell>{c.whatsapp ?? "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{c.email ?? "—"}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" onClick={() => openFor(c)}>Edit</Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -168,24 +193,43 @@ export function BranchesTab({ orgId }: { orgId: string }) {
     queryFn: async () => (await api<Branch[]>(`/api/v1/organizations/${orgId}/branches`)).data,
   });
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ branch_name: "", city: "", area: "", delivery_address: "" });
+  const [editing, setEditing] = useState<Branch | null>(null);
+  const empty = { branch_name: "", city: "", area: "", delivery_address: "", map_url: "" };
+  const [form, setForm] = useState(empty);
 
-  const create = useMutation({
-    mutationFn: () =>
-      api(`/api/v1/organizations/${orgId}/branches`, {
-        method: "POST",
-        body: {
-          branch_name: form.branch_name,
-          city: form.city || null,
-          area: form.area || null,
-          delivery_address: form.delivery_address || null,
-        },
-      }),
+  function openFor(branch: Branch | null) {
+    setEditing(branch);
+    setForm(branch ? {
+      branch_name: branch.branch_name,
+      city: branch.city ?? "",
+      area: branch.area ?? "",
+      delivery_address: branch.delivery_address ?? "",
+      map_url: branch.map_url ?? "",
+    } : empty);
+    setOpen(true);
+  }
+
+  const save = useMutation({
+    mutationFn: () => {
+      const body = {
+        branch_name: form.branch_name,
+        city: form.city || null,
+        area: form.area || null,
+        delivery_address: form.delivery_address || null,
+        map_url: form.map_url || null,
+        billing_address: editing?.billing_address ?? null,
+        route_cluster: editing?.route_cluster ?? null,
+        is_primary: editing?.is_primary ?? false,
+        is_active: editing?.is_active ?? true,
+      };
+      return editing
+        ? api(`/api/v1/organizations/branches/${editing.id}`, { method: "PATCH", body })
+        : api(`/api/v1/organizations/${orgId}/branches`, { method: "POST", body });
+    },
     onSuccess: () => {
-      toast.success("Branch added");
+      toast.success(editing ? "Branch updated" : "Branch added");
       queryClient.invalidateQueries({ queryKey: ["org", orgId, "branches"] });
       setOpen(false);
-      setForm({ branch_name: "", city: "", area: "", delivery_address: "" });
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
   });
@@ -193,13 +237,15 @@ export function BranchesTab({ orgId }: { orgId: string }) {
   if (isLoading) return <Skeleton className="h-40 w-full" />;
   return (
     <div className="space-y-3">
+      <Button variant="outline" size="sm" onClick={() => openFor(null)}>
+        <Plus className="mr-1 h-3.5 w-3.5" aria-hidden /> Add branch
+      </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-card px-3 text-sm hover:bg-muted">
-          <Plus className="h-3.5 w-3.5" aria-hidden /> Add branch
-        </DialogTrigger>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add branch</DialogTitle></DialogHeader>
-          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
+          <DialogHeader>
+            <DialogTitle>{editing ? `Edit ${editing.branch_name}` : "Add branch"}</DialogTitle>
+          </DialogHeader>
+          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
             <div className="space-y-1.5">
               <Label htmlFor="br-name">Branch name *</Label>
               <Input id="br-name" required value={form.branch_name}
@@ -222,8 +268,15 @@ export function BranchesTab({ orgId }: { orgId: string }) {
               <Textarea id="br-addr" value={form.delivery_address}
                 onChange={(e) => setForm({ ...form, delivery_address: e.target.value })} />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="br-map">Map link</Label>
+              <Input id="br-map" value={form.map_url}
+                onChange={(e) => setForm({ ...form, map_url: e.target.value })} />
+            </div>
             <DialogFooter>
-              <Button type="submit" disabled={!form.branch_name || create.isPending}>Save</Button>
+              <Button type="submit" disabled={!form.branch_name || save.isPending}>
+                {save.isPending ? "Saving…" : "Save"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -237,6 +290,7 @@ export function BranchesTab({ orgId }: { orgId: string }) {
               <TableRow>
                 <TableHead>Branch</TableHead><TableHead>City / Area</TableHead>
                 <TableHead>Delivery address</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -244,10 +298,17 @@ export function BranchesTab({ orgId }: { orgId: string }) {
                 <TableRow key={b.id}>
                   <TableCell className="font-medium">
                     {b.branch_name} {b.is_primary && <Badge variant="secondary">Primary</Badge>}
+                    {b.map_url && (
+                      <a className="ml-2 text-xs text-primary underline" target="_blank"
+                        rel="noopener noreferrer" href={b.map_url}>map</a>
+                    )}
                   </TableCell>
                   <TableCell>{b.city ?? "—"} {b.area ? `· ${b.area}` : ""}</TableCell>
                   <TableCell className="max-w-md text-sm text-muted-foreground">
                     {b.delivery_address ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" onClick={() => openFor(b)}>Edit</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -539,11 +600,23 @@ export function TasksTab({ orgId }: { orgId: string }) {
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
   });
 
-  const complete = useMutation({
-    mutationFn: (taskId: string) =>
-      api(`/api/v1/prospects/tasks/${taskId}`, { method: "PATCH", body: { status: "done" } }),
+  const patch = useMutation({
+    mutationFn: ({ taskId, body }: { taskId: string; body: Record<string, unknown> }) =>
+      api(`/api/v1/prospects/tasks/${taskId}`, { method: "PATCH", body }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["org", orgId, "tasks"] }),
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
   });
+
+  function editTask(t: Task) {
+    const newTitle = window.prompt("Task title:", t.title);
+    if (newTitle === null) return;
+    const currentLocal = new Date(t.due_at).toISOString().slice(0, 16);
+    const newDue = window.prompt("Due (YYYY-MM-DDTHH:MM):", currentLocal);
+    if (newDue === null) return;
+    const parsed = new Date(newDue);
+    if (Number.isNaN(parsed.getTime())) { toast.error("Invalid date"); return; }
+    patch.mutate({ taskId: t.id, body: { title: newTitle || t.title, due_at: parsed.toISOString() } });
+  }
 
   if (isLoading) return <Skeleton className="h-40 w-full" />;
   return (
@@ -584,9 +657,13 @@ export function TasksTab({ orgId }: { orgId: string }) {
                   </p>
                 </div>
                 {t.status === "open" && (
-                  <Button variant="outline" size="sm" onClick={() => complete.mutate(t.id)}>
-                    Mark done
-                  </Button>
+                  <span className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => editTask(t)}>Edit</Button>
+                    <Button variant="outline" size="sm"
+                      onClick={() => patch.mutate({ taskId: t.id, body: { status: "done" } })}>
+                      Mark done
+                    </Button>
+                  </span>
                 )}
               </li>
             );

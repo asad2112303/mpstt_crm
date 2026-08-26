@@ -66,6 +66,28 @@ async def create_warehouse(
                "address": warehouse.address, "is_active": warehouse.is_active})
 
 
+@router.patch("/warehouses/{warehouse_id}")
+async def update_warehouse(
+    warehouse_id: uuid.UUID,
+    payload: WarehouseIn,
+    admin: CurrentUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    warehouse = await db.get(Warehouse, warehouse_id)
+    if warehouse is None:
+        raise NotFoundError("Warehouse not found.")
+    for field, value in payload.model_dump().items():
+        setattr(warehouse, field, value)
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        raise ConflictError("A warehouse with this code already exists.",
+                            code="DUPLICATE_CODE") from exc
+    await db.commit()
+    return ok({"id": str(warehouse.id), "code": warehouse.code, "name": warehouse.name,
+               "address": warehouse.address, "is_active": warehouse.is_active})
+
+
 @router.get("/balances")
 async def stock_balances(
     warehouse_id: uuid.UUID | None = Query(None),

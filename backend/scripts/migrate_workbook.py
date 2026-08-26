@@ -85,7 +85,8 @@ def note_join(*parts: str) -> str | None:
 
 
 async def main() -> int:
-    from sqlalchemy import select, text as sql_text
+    from sqlalchemy import select
+    from sqlalchemy import text as sql_text
 
     from app.core.db import dispose_engine, get_session_factory
     from app.models.catalogue import Brand, Product, ProductCategory, ProductVariant, UnitOfMeasure
@@ -129,8 +130,11 @@ async def main() -> int:
         }
         for label, (code, scale) in UOM_DEFS.items():
             if code not in uom_by_code:
-                uom = UnitOfMeasure(code=code, name=label.strip(), category="count" if scale == 0 else "weight",
-                                    decimal_scale=scale)
+                uom = UnitOfMeasure(
+                    code=code, name=label.strip(),
+                    category="count" if scale == 0 else "weight",
+                    decimal_scale=scale,
+                )
                 s.add(uom)
                 await s.flush()
                 uom_by_code[code] = uom

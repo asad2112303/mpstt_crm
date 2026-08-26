@@ -1,22 +1,165 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiError, newIdempotencyKey } from "@/lib/api";
 import type { Organization } from "@/lib/types/crm";
 import type { Order } from "@/lib/types/orders";
+import type { SearchHit } from "@/lib/types/catalogue";
 import { OrderStatusBadge } from "../page";
 import { DocumentsPanel } from "@/components/documents-panel";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+
+function DraftOrderEditor({ order }: { order: Order }) {
+  const queryClient = useQueryClient();
+  const [lines, setLines] = useState(
+    order.items.map((i) => ({
+      product_variant_id: i.product_variant_id,
+      label: i.description_snapshot,
+      quantity: i.quantity,
+      unit_price: i.unit_price,
+      discount_percent: i.discount_percent,
+    })),
+  );
+  const [poNumber, setPoNumber] = useState(order.customer_po_number ?? "");
+  const [notes, setNotes] = useState(order.notes ?? "");
+  const [itemQ, setItemQ] = useState("");
+
+  const { data: hits } = useQuery({
+    queryKey: ["catalogue", "search", itemQ],
+    queryFn: async () =>
+      (await api<SearchHit[]>("/api/v1/catalogue/search", { searchParams: { q: itemQ } })).data,
+    enabled: itemQ.length >= 2,
+  });
+
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/api/v1/orders/${order.id}`, {
+        method: "PUT",
+        body: {
+          customer_po_number: poNumber || null,
+          notes: notes || null,
+          items: lines.map((l) => ({
+            product_variant_id: l.product_variant_id,
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            discount_percent: l.discount_percent || "0",
+          })),
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Draft order saved — totals recalculated");
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Save failed"),
+  });
+
+  const valid = lines.length > 0 &&
+    lines.every((l) => Number(l.quantity) > 0 && Number(l.unit_price) >= 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Edit draft order (frozen at confirmation)</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="relative">
+          <Input placeholder="Add item: search product / variant…" value={itemQ}
+            onChange={(e) => setItemQ(e.target.value)} aria-label="Search catalogue" />
+          {itemQ.length >= 2 && hits && (
+            <ul className="absolute z-30 mt-1 max-h-44 w-full overflow-auto rounded-md border border-border bg-popover shadow-md">
+              {hits.map((h) => (
+                <li key={`${h.product_id}-${h.variant_id}`}>
+                  <button type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                    onClick={() => {
+                      setLines((prev) => [...prev, {
+                        product_variant_id: h.variant_id!, label: h.label,
+                        quantity: "1", unit_price: "", discount_percent: "0",
+                      }]);
+                      setItemQ("");
+                    }}>
+                    {h.label} <span className="text-xs text-muted-foreground">({h.sku})</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Item</TableHead>
+                <TableHead className="w-24">Qty</TableHead>
+                <TableHead className="w-28">Rate</TableHead>
+                <TableHead className="w-24">Disc %</TableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lines.map((l, i) => (
+                <TableRow key={`${l.product_variant_id}-${i}`}>
+                  <TableCell className="text-sm">{l.label}</TableCell>
+                  <TableCell>
+                    <Input type="number" min="0.001" step="any" value={l.quantity}
+                      aria-label="Quantity"
+                      onChange={(e) => setLines((p) =>
+                        p.map((x, j) => j === i ? { ...x, quantity: e.target.value } : x))} />
+                  </TableCell>
+                  <TableCell>
+                    <Input type="number" min="0" step="0.01" value={l.unit_price}
+                      aria-label="Unit price"
+                      onChange={(e) => setLines((p) =>
+                        p.map((x, j) => j === i ? { ...x, unit_price: e.target.value } : x))} />
+                  </TableCell>
+                  <TableCell>
+                    <Input type="number" min="0" max="100" step="0.01" value={l.discount_percent}
+                      aria-label="Discount"
+                      onChange={(e) => setLines((p) =>
+                        p.map((x, j) => j === i ? { ...x, discount_percent: e.target.value } : x))} />
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon-sm" aria-label="Remove line"
+                      onClick={() => setLines((p) => p.filter((_, j) => j !== i))}>
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="do-po">Customer PO number</Label>
+            <Input id="do-po" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="do-notes">Notes</Label>
+            <Input id="do-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+        <Button onClick={() => save.mutate()} disabled={!valid || save.isPending}>
+          {save.isPending ? "Saving…" : "Save draft"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function OrderDetailPage({
   params,
@@ -130,6 +273,8 @@ export default function OrderDetailPage({
           </div>
         }
       />
+
+      {s === "draft" && <DraftOrderEditor key={order.items.map((i) => i.id).join(",")} order={order} />}
 
       <Card>
         <CardHeader><CardTitle className="text-base">Items (frozen snapshots)</CardTitle></CardHeader>

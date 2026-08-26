@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiError } from "@/lib/api";
 import { ORG_TYPE_LABELS, formatKarachi, type Organization } from "@/lib/types/crm";
+import { EditOrganizationDialog } from "@/components/edit-org-dialog";
 import {
   ActivitiesTab, BranchesTab, ContactsTab, PricesTab, SamplesTab, TasksTab,
 } from "@/components/org-tabs";
@@ -138,7 +139,10 @@ export default function CustomerDetailPage({
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base">Identity</CardTitle></CardHeader>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="text-base">Identity</CardTitle>
+            <EditOrganizationDialog org={org} />
+          </CardHeader>
           <CardContent className="space-y-1.5 text-sm">
             <p><span className="text-muted-foreground">Org code:</span> {org.org_code}</p>
             <p><span className="text-muted-foreground">Phone:</span> {org.phone ?? "—"}</p>

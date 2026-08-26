@@ -164,6 +164,61 @@ async def get_order(
     return ok(order_out(await _get_order(db, order_id)))
 
 
+class DraftOrderUpdateIn(BaseModel):
+    items: list[OrderItemIn] | None = None
+    branch_id: uuid.UUID | None = None
+    customer_po_number: str | None = Field(default=None, max_length=100)
+    expected_delivery_date: date | None = None
+    notes: str | None = None
+
+
+@router.put("/{order_id}")
+async def update_draft_order(
+    order_id: uuid.UUID,
+    payload: DraftOrderUpdateIn,
+    user: CurrentUser = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Draft orders stay editable; confirmed+ orders are frozen snapshots."""
+    order = await _get_order(db, order_id, for_update=True)
+    if order.status != "draft":
+        raise ConflictError(
+            "Only a draft order can be edited. Confirmed orders are frozen.",
+            code="ORDER_NOT_DRAFT",
+        )
+    for field in ("branch_id", "customer_po_number", "expected_delivery_date", "notes"):
+        value = getattr(payload, field)
+        if value is not None:
+            setattr(order, field, value)
+    if payload.items is not None:
+        items, amounts = await build_order_items(
+            db,
+            [
+                OrderItemInput(
+                    product_variant_id=i.product_variant_id,
+                    quantity=i.quantity,
+                    unit_price=i.unit_price,
+                    discount_percent=i.discount_percent,
+                )
+                for i in payload.items
+            ],
+        )
+        totals = sum_lines(amounts)
+        order.items.clear()
+        await db.flush()
+        order.items.extend(items)
+        order.subtotal = totals.subtotal
+        order.discount_total = totals.discount_total
+        order.tax_total = totals.tax_total
+        order.grand_total = totals.grand_total
+    order.updated_by = uuid.UUID(user.id)
+    await db.flush()
+    await write_audit(db, action="order.draft_updated", entity_type="sales_order",
+                      entity_id=order.id, new={"order_number": order.order_number})
+    await db.commit()
+    return ok(order_out(await _get_order(db, order_id)))
+
+
 @router.post("/{order_id}/confirm")
 async def confirm(
     order_id: uuid.UUID,
