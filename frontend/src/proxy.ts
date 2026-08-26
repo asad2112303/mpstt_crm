@@ -5,7 +5,9 @@ const PUBLIC_PATHS = ["/login", "/auth", "/unauthorized"];
 
 export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // Without Supabase configured (bare local preview), pass through; the
   // backend still rejects every unauthenticated API call.
