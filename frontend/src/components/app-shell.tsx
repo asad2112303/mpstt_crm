@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   Package,
+  ScrollText,
   Settings,
   ShieldCheck,
   Users,
@@ -67,6 +68,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/admin/users", label: "Users", icon: Users, adminOnly: true },
       { href: "/admin/settings", label: "Settings", icon: Settings, adminOnly: true },
+      { href: "/admin/audit", label: "Audit log", icon: ScrollText, adminOnly: true },
     ],
   },
 ];
