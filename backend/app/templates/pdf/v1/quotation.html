@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block doc_title %}QUOTATION{% endblock %}
+
+{% block doc_meta %}
+  <strong>{{ quote.number }}</strong>{% if quote.revision_no > 1 %} · Rev {{ quote.revision_no }}{% endif %}<br>
+  Date: {{ quote.date }}<br>
+  {% if quote.valid_until %}Valid until: {{ quote.valid_until }}{% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="party-grid">
+    <div class="party-box">
+      <h4>Quotation for</h4>
+      <strong>{{ customer.name }}</strong><br>
+      {% if customer.branch_name %}{{ customer.branch_name }}<br>{% endif %}
+      {% if customer.address %}{{ customer.address }}<br>{% endif %}
+      {% if customer.city %}{{ customer.city }}<br>{% endif %}
+      {% if customer.ntn %}NTN: {{ customer.ntn }}{% endif %}
+    </div>
+    <div class="party-box">
+      <h4>Attention</h4>
+      {% if customer.contact_name %}{{ customer.contact_name }}<br>{% endif %}
+      {% if customer.contact_phone %}{{ customer.contact_phone }}<br>{% endif %}
+      {% if customer.phone %}Tel: {{ customer.phone }}{% endif %}
+    </div>
+  </div>
+
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:6%">S.No</th>
+        <th style="width:38%">Description</th>
+        <th class="num" style="width:10%">Qty</th>
+        <th style="width:8%">UOM</th>
+        <th class="num" style="width:12%">Rate ({{ quote.currency }})</th>
+        <th class="num" style="width:8%">Disc %</th>
+        <th class="num" style="width:8%">Tax %</th>
+        <th class="num" style="width:12%">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>{{ item.sn }}</td>
+        <td>
+          {{ item.description }}
+          {% if item.specification %}
+            <div class="spec">
+              {% for key, value in item.specification.items() %}{{ key | replace("_", " ") }}: {{ value }}{% if not loop.last %} · {% endif %}{% endfor %}
+            </div>
+          {% endif %}
+        </td>
+        <td class="num">{{ item.quantity }}</td>
+        <td>{{ item.uom }}</td>
+        <td class="num">{{ item.unit_price | money }}</td>
+        <td class="num">{{ item.discount_percent }}</td>
+        <td class="num">{{ item.tax_rate }}</td>
+        <td class="num">{{ item.line_total | money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><td>Subtotal</td><td class="num">{{ quote.subtotal | money }}</td></tr>
+    {% if quote.discount_total and quote.discount_total > 0 %}
+    <tr><td>Discount</td><td class="num">-{{ quote.discount_total | money }}</td></tr>
+    {% endif %}
+    <tr><td>Tax</td><td class="num">{{ quote.tax_total | money }}</td></tr>
+    <tr class="grand"><td>Grand total ({{ quote.currency }})</td><td class="num">{{ quote.grand_total | money }}</td></tr>
+  </table>
+
+  {% if quote.terms %}
+  <div class="terms">
+    <h4>Terms &amp; conditions</h4>
+    <div style="white-space: pre-wrap;">{{ quote.terms }}</div>
+  </div>
+  {% endif %}
+  {% if company.bank_details %}
+  <div class="terms">
+    <h4>Bank details</h4>
+    <div style="white-space: pre-wrap;">{{ company.bank_details }}</div>
+  </div>
+  {% endif %}
+  {% if quote.notes %}
+  <div class="terms">
+    <h4>Notes</h4>
+    <div style="white-space: pre-wrap;">{{ quote.notes }}</div>
+  </div>
+  {% endif %}
+{% endblock %}

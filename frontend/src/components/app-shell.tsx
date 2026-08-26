@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 import {
   BellRing,
   Building2,
+  FileText,
   Layers,
   LayoutDashboard,
   LogOut,
@@ -53,6 +54,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/prospects", label: "Prospects", icon: Building2 },
       { href: "/customers", label: "Customers", icon: Users },
+      { href: "/quotations", label: "Quotations", icon: FileText },
       { href: "/follow-ups", label: "Follow-ups", icon: BellRing },
     ],
   },
