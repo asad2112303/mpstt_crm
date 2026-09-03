@@ -19,6 +19,16 @@
 **Backend tests: 100+ (unit, DB, API, permissions, concurrency, idempotency, UAT lifecycle).**
 **Frontend: lint + typecheck + build clean; Playwright smoke E2E green.**
 
+## Deployment status
+
+| Layer | Where | State |
+|---|---|---|
+| Database + Auth + Storage | Supabase (managed) | ✅ live — schema migrated, 93 organizations, 27 customers, 16 products, admin seeded |
+| Backend API | Railway (`infra/Dockerfile.backend`) | ✅ live — `/health` production, `/ready` connected |
+| Frontend | Vercel (root dir `frontend/`) | ✅ deployed — needs `NEXT_PUBLIC_API_BASE_URL` = Railway domain |
+
+Setup notes and pitfalls: `docs/runbooks/cloud-deployment.md`.
+
 ## Deviations from the blueprint (documented)
 
 - **pgTAP** replaced by pytest-based DB tests against real Postgres (same

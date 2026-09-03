@@ -40,6 +40,19 @@ npm install
 npm run dev                   # http://localhost:3000
 ```
 
+## Deployment
+
+Live topology: **Vercel** (Next.js frontend) → **Railway** (FastAPI backend
+container) → **Supabase** (Postgres + Auth + private Storage). The backend needs
+a long-running process for row-locked transactions and PDF rendering, so it does
+not run on Vercel.
+
+- Cloud setup, env variables and gotchas: `docs/runbooks/cloud-deployment.md`
+- Self-hosted Docker alternative: `infra/docker-compose.prod.yml` +
+  `docs/runbooks/deploy-production.md`
+- Go-live checklist: `docs/runbooks/go-live-checklist.md`
+- Backups (database **and** storage objects are separate): `docs/runbooks/backup-restore.md`
+
 ## Tests
 
 ```bash
