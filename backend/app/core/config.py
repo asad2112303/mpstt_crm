@@ -23,6 +23,9 @@ class Settings(BaseSettings):
 
     # CORS allowlist, comma separated origins
     cors_origins: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
+    # Optional regex for deploy-preview origins whose hostname changes per build,
+    # e.g. r"https://mpstt-.*\.vercel\.app". Empty disables pattern matching.
+    cors_origin_regex: str = Field(default="", alias="CORS_ORIGIN_REGEX")
 
     # Supabase project (auth + storage)
     supabase_url: str = Field(default="", alias="SUPABASE_URL")

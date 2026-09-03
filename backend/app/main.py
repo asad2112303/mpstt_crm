@@ -34,6 +34,9 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
+        # Optional pattern for ephemeral deploy previews (e.g. Vercel branch URLs),
+        # which get a new hostname per build and cannot be listed individually.
+        allow_origin_regex=settings.cors_origin_regex or None,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

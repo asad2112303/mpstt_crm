@@ -121,3 +121,35 @@ def test_production_still_requires_supabase_url(monkeypatch):
     )
     with _pytest.raises(RuntimeError, match="SUPABASE_URL"):
         settings.validate_for_env()
+
+
+async def test_cors_allows_preview_origin_via_regex(monkeypatch):
+    """Vercel preview hostnames change per build, so a regex must be honoured."""
+    import os
+
+    from httpx import ASGITransport, AsyncClient
+
+    from app.core import config as config_module
+
+    monkeypatch.setenv("CORS_ORIGIN_REGEX", r"https://mpstt-.*\.vercel\.app")
+    monkeypatch.setenv("CORS_ORIGINS", "https://mpstt-puce.vercel.app")
+    config_module.get_settings.cache_clear()
+    try:
+        from app.main import create_app
+
+        app = create_app()
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.options(
+                "/api/v1/dashboard/summary",
+                headers={
+                    "Origin": "https://mpstt-lsihhgxcc-rasad2465-5676s-projects.vercel.app",
+                    "Access-Control-Request-Method": "GET",
+                },
+            )
+        assert resp.headers.get("access-control-allow-origin") == (
+            "https://mpstt-lsihhgxcc-rasad2465-5676s-projects.vercel.app"
+        )
+    finally:
+        os.environ.pop("CORS_ORIGIN_REGEX", None)
+        config_module.get_settings.cache_clear()
