@@ -87,3 +87,37 @@ async def test_crm_schema_and_extensions_exist(raw_conn):
         )
     }
     assert exts == {"pgcrypto", "pg_trgm"}
+
+
+def test_production_accepts_jwks_only_verification(monkeypatch):
+    """ES256 projects have no legacy JWT secret — SUPABASE_URL (JWKS) suffices."""
+    from app.core.config import Settings
+
+    settings = Settings(
+        _env_file=None,
+        APP_ENV="production",
+        DATABASE_URL="postgresql+asyncpg://u:p@h/db",
+        SUPABASE_URL="https://example.supabase.co",
+        SUPABASE_JWT_SECRET="",
+        STORAGE_BACKEND="supabase",
+        REQUIRE_ADMIN_MFA=True,
+        CORS_ORIGINS="https://crm.example.com",
+    )
+    settings.validate_for_env()  # must not raise
+
+
+def test_production_still_requires_supabase_url(monkeypatch):
+    import pytest as _pytest
+
+    from app.core.config import Settings
+
+    settings = Settings(
+        _env_file=None,
+        APP_ENV="production",
+        DATABASE_URL="postgresql+asyncpg://u:p@h/db",
+        SUPABASE_URL="",
+        STORAGE_BACKEND="supabase",
+        REQUIRE_ADMIN_MFA=True,
+    )
+    with _pytest.raises(RuntimeError, match="SUPABASE_URL"):
+        settings.validate_for_env()

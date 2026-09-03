@@ -61,8 +61,13 @@ class Settings(BaseSettings):
             problems = []
             if not self.supabase_url:
                 problems.append("SUPABASE_URL is required")
-            if not self.supabase_jwt_secret:
-                problems.append("SUPABASE_JWT_SECRET (or JWKS) is required")
+            # Tokens are verified either against the project's JWKS (ES256 —
+            # the current Supabase default, needs only SUPABASE_URL) or against
+            # the legacy HS256 secret. One of the two must be available.
+            if not self.supabase_url and not self.supabase_jwt_secret:
+                problems.append(
+                    "Token verification needs SUPABASE_URL (JWKS) or SUPABASE_JWT_SECRET"
+                )
             if self.storage_backend != "supabase":
                 problems.append("STORAGE_BACKEND must be 'supabase'")
             if self.env == "production" and not self.require_admin_mfa:
