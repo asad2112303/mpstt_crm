@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...opted in: publishable build values that ship to the browser anyway
+!.env.production
+!.env.example
 
 # vercel
 .vercel

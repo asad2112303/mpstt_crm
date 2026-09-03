@@ -21,6 +21,8 @@ htmlcov/
 !.env.example
 !*/.env.example
 !infra/.env.prod.example
+# Publishable production build values (safe: they ship to the browser)
+!frontend/.env.production
 
 # Build artifacts
 dist/
