@@ -1,0 +1,84 @@
+# MPSTT CRM — production stack
+#
+# Usage (from the repo root):
+#   cp infra/.env.prod.example infra/.env.prod   # fill in real values (never commit)
+#   docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod build
+#   docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod run --rm migrate
+#   docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d api web
+#
+# The database and storage are the managed Supabase project — no local Postgres
+# runs in production. Put TLS in front (platform load balancer, Caddy, or nginx):
+# web listens on :3000, api on :8000.
+
+name: mpstt-crm-prod
+
+services:
+  # One-shot: apply Alembic migrations, then exit. Run before starting api.
+  migrate:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.backend
+    command: ["uv", "run", "alembic", "upgrade", "head"]
+    environment:
+      APP_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      STORAGE_BACKEND: supabase
+      REQUIRE_ADMIN_MFA: "true"
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    restart: "no"
+    profiles: ["ops"]
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.backend
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      DATABASE_URL: ${DATABASE_URL}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_JWT_AUD: authenticated
+      STORAGE_BACKEND: supabase
+      REQUIRE_ADMIN_MFA: "true"
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD-SHELL",
+             "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/ready', timeout=5)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.frontend
+      args:
+        # Publishable values only — baked into the client bundle at build time.
+        NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_PUBLISHABLE_KEY}
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_PUBLISHABLE_KEY}
+      NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
