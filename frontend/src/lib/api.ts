@@ -2,8 +2,22 @@
 
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+/**
+ * Normalizes the configured API origin.
+ *
+ * Hosting dashboards are often given a bare hostname ("api.example.com"), which
+ * makes `new URL()` throw *before* any request is sent — the app then fails with
+ * no network activity and nothing in the console. Assume HTTPS for a bare host,
+ * and tolerate stray whitespace or a trailing slash.
+ */
+export function normalizeApiBase(raw: string | undefined): string {
+  const value = (raw ?? "").trim().replace(/\/+$/, "");
+  if (!value) return "http://localhost:8000";
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+}
+
+export const API_BASE = normalizeApiBase(process.env.NEXT_PUBLIC_API_BASE_URL);
 
 export interface ApiMeta {
   request_id: string;

@@ -4,13 +4,12 @@ import { useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileUp, Paperclip } from "lucide-react";
 import { toast } from "sonner";
-import { ApiError, api } from "@/lib/api";
+import { API_BASE, ApiError, api } from "@/lib/api";
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 import { formatKarachi } from "@/lib/types/crm";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export interface DocumentRow {
   id: string;

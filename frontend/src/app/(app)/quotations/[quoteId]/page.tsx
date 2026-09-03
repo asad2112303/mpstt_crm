@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, FileDown, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { api, ApiError, newIdempotencyKey } from "@/lib/api";
+import { API_BASE, api, ApiError, newIdempotencyKey } from "@/lib/api";
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 import type { Organization } from "@/lib/types/crm";
 import type { Quote } from "@/lib/types/quotes";
@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 async function openPdf(quoteId: string) {
   let headers: Record<string, string> = {};

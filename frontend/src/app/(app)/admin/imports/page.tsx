@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileUp, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { ApiError, api } from "@/lib/api";
+import { API_BASE, ApiError, api } from "@/lib/api";
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 import { formatKarachi } from "@/lib/types/crm";
 import { PageHeader } from "@/components/page-header";
@@ -17,7 +17,6 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 interface ImportRowOut {
   id: string;

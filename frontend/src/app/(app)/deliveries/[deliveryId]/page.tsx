@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, FileDown } from "lucide-react";
 import { toast } from "sonner";
-import { api, ApiError, newIdempotencyKey } from "@/lib/api";
+import { API_BASE, api, ApiError, newIdempotencyKey } from "@/lib/api";
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 import { formatKarachi } from "@/lib/types/crm";
 import { DeliveryStatusBadge, type DeliveryRow } from "../page";
@@ -21,7 +21,6 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 async function openChallanPdf(deliveryId: string) {
   let headers: Record<string, string> = {};

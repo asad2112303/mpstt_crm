@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Banknote, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { api, ApiError, newIdempotencyKey } from "@/lib/api";
+import { API_BASE, api, ApiError, newIdempotencyKey } from "@/lib/api";
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import type { Organization } from "@/lib/types/crm";
@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export interface PaymentRow {
   id: string;
