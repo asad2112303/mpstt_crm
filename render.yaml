@@ -1,0 +1,30 @@
+# Render blueprint for the MPSTT CRM backend (alternative to Railway).
+# Database, auth and storage stay on the managed Supabase project.
+# Set the secret values in the Render dashboard — never commit them.
+services:
+  - type: web
+    name: mpstt-crm-api
+    runtime: docker
+    dockerfilePath: ./infra/Dockerfile.backend
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: STORAGE_BACKEND
+        value: supabase
+      - key: REQUIRE_ADMIN_MFA
+        value: "true"
+      - key: SUPABASE_JWT_AUD
+        value: authenticated
+      # Set these in the dashboard (marked sync:false so they are not in git):
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
