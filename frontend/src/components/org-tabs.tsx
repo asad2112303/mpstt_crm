@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiError } from "@/lib/api";
 import {
   formatKarachi,
   type Activity, type Branch, type Contact,
-  type SampleRow, type Task, type PriceRow,
+  type SampleRow, type Task, type PriceRow, type ProductProfileRow,
 } from "@/lib/types/crm";
-import type { SearchHit } from "@/lib/types/catalogue";
+import type { SearchHit, Uom } from "@/lib/types/catalogue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -806,3 +806,291 @@ export function PricesTab({ orgId }: { orgId: string }) {
   );
 }
 
+
+/* ---------- requirements (what the organization consumes) ---------- */
+
+const FREQUENCIES = ["weekly", "monthly", "quarterly", "adhoc"] as const;
+
+interface RequirementDraft {
+  product_id: string;
+  product_variant_id: string | null;
+  label: string;
+  frequency: string;
+  min_quantity: string;
+  max_quantity: string;
+  uom_id: string;
+  current_supplier: string;
+  current_rate: string;
+  specification_notes: string;
+}
+
+const EMPTY_REQUIREMENT: RequirementDraft = {
+  product_id: "", product_variant_id: null, label: "", frequency: "monthly",
+  min_quantity: "", max_quantity: "", uom_id: "", current_supplier: "",
+  current_rate: "", specification_notes: "",
+};
+
+function toDraft(row: ProductProfileRow): RequirementDraft {
+  return {
+    product_id: row.product_id,
+    product_variant_id: row.product_variant_id,
+    label: [row.product_name, row.variant_name].filter(Boolean).join(" — ") || "Product",
+    frequency: row.frequency ?? "",
+    min_quantity: row.min_quantity ?? "",
+    max_quantity: row.max_quantity ?? "",
+    uom_id: row.uom_id ?? "",
+    current_supplier: row.current_supplier ?? "",
+    current_rate: row.current_rate ?? "",
+    specification_notes: row.specification_notes ?? "",
+  };
+}
+
+/** Blank strings become null: the API rejects "" and requires quantities > 0. */
+function toPayload(d: RequirementDraft) {
+  return {
+    product_id: d.product_id,
+    product_variant_id: d.product_variant_id,
+    frequency: d.frequency || null,
+    min_quantity: d.min_quantity || null,
+    max_quantity: d.max_quantity || null,
+    uom_id: d.uom_id || null,
+    current_supplier: d.current_supplier || null,
+    current_rate: d.current_rate || null,
+    specification_notes: d.specification_notes || null,
+  };
+}
+
+export function RequirementsTab({ orgId }: { orgId: string }) {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["org", orgId, "product-profiles"],
+    queryFn: async () =>
+      (await api<ProductProfileRow[]>(`/api/v1/prospects/${orgId}/product-profiles`)).data,
+  });
+  const { data: uoms } = useQuery({
+    queryKey: ["catalogue", "uoms"],
+    queryFn: async () => (await api<Uom[]>("/api/v1/catalogue/uoms")).data,
+  });
+
+  const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<RequirementDraft>(EMPTY_REQUIREMENT);
+
+  // The endpoint replaces the whole set in one transaction, so every change
+  // sends the full list — with the edited row swapped in or the removed one
+  // left out. Recording requirements also advances the prospect stage.
+  const save = useMutation({
+    mutationFn: (rows: RequirementDraft[]) =>
+      api(`/api/v1/prospects/${orgId}/product-profiles`, {
+        method: "PUT",
+        body: rows.map(toPayload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org", orgId, "product-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["org", orgId] });
+      setOpen(false);
+      setEditingId(null);
+      setDraft(EMPTY_REQUIREMENT);
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not save requirement"),
+  });
+
+  const rows = data ?? [];
+
+  function submit() {
+    const drafts = rows.map(toDraft);
+    if (editingId) {
+      const index = rows.findIndex((r) => r.id === editingId);
+      drafts[index] = draft;
+    } else {
+      drafts.push(draft);
+    }
+    save.mutate(drafts);
+  }
+
+  function remove(id: string) {
+    save.mutate(rows.filter((r) => r.id !== id).map(toDraft));
+  }
+
+  function openAdd() {
+    setEditingId(null);
+    setDraft(EMPTY_REQUIREMENT);
+    setOpen(true);
+  }
+
+  function openEdit(row: ProductProfileRow) {
+    setEditingId(row.id);
+    setDraft(toDraft(row));
+    setOpen(true);
+  }
+
+  if (isLoading) return <Skeleton className="h-40 w-full" />;
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          Estimated consumption per product — the basis for quoting. Imported rows keep
+          their original wording and any assumption made during migration.
+        </p>
+        <Button variant="outline" size="sm" onClick={openAdd} disabled={save.isPending}>
+          <Plus className="mr-1 h-3.5 w-3.5" aria-hidden /> Add requirement
+        </Button>
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingId ? "Edit requirement" : "Add requirement"}</DialogTitle>
+          </DialogHeader>
+          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+            <div className="space-y-1.5">
+              <Label>Product / variant *</Label>
+              {draft.product_id ? (
+                <div className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
+                  <span>{draft.label}</span>
+                  <Button type="button" variant="ghost" size="sm"
+                    onClick={() => setDraft({ ...draft, product_id: "", product_variant_id: null, label: "" })}>
+                    Change
+                  </Button>
+                </div>
+              ) : (
+                <VariantPicker
+                  onPick={(hit) => setDraft({
+                    ...draft, product_id: hit.product_id,
+                    product_variant_id: hit.variant_id, label: hit.label,
+                  })}
+                />
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="rq-freq">Frequency</Label>
+                <Select value={draft.frequency}
+                  onValueChange={(v) => setDraft({ ...draft, frequency: v ?? "" })}>
+                  <SelectTrigger id="rq-freq"><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    {FREQUENCIES.map((f) => (
+                      <SelectItem key={f} value={f} className="capitalize">{f}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="rq-min">Qty from</Label>
+                <Input id="rq-min" type="number" min="0.001" step="0.001" value={draft.min_quantity}
+                  onChange={(e) => setDraft({ ...draft, min_quantity: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="rq-max">Qty to</Label>
+                <Input id="rq-max" type="number" min="0.001" step="0.001" value={draft.max_quantity}
+                  onChange={(e) => setDraft({ ...draft, max_quantity: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="rq-uom">Unit</Label>
+                <Select value={draft.uom_id}
+                  onValueChange={(v) => setDraft({ ...draft, uom_id: v ?? "" })}>
+                  <SelectTrigger id="rq-uom"><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    {(uoms ?? []).map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.code}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="rq-supplier">Current supplier</Label>
+                <Input id="rq-supplier" value={draft.current_supplier}
+                  onChange={(e) => setDraft({ ...draft, current_supplier: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="rq-rate">Their current rate (PKR)</Label>
+                <Input id="rq-rate" type="number" min="0.01" step="0.01" value={draft.current_rate}
+                  onChange={(e) => setDraft({ ...draft, current_rate: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="rq-notes">Specification / notes</Label>
+              <Textarea id="rq-notes" rows={3} value={draft.specification_notes}
+                onChange={(e) => setDraft({ ...draft, specification_notes: e.target.value })} />
+            </div>
+
+            <DialogFooter>
+              <Button type="submit" disabled={!draft.product_id || save.isPending}>
+                {save.isPending ? "Saving…" : "Save"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {!rows.length ? (
+        <p className="text-sm text-muted-foreground">
+          No requirements recorded yet.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead>Frequency</TableHead>
+                <TableHead className="text-right">Estimated quantity</TableHead>
+                <TableHead>Current supplier</TableHead>
+                <TableHead className="text-right">Their rate</TableHead>
+                <TableHead>Notes</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => {
+                const min = row.min_quantity ? Number(row.min_quantity) : null;
+                const max = row.max_quantity ? Number(row.max_quantity) : null;
+                const range = min !== null && max !== null && min !== max
+                  ? `${min}–${max}` : (min ?? max) !== null ? String(min ?? max) : "—";
+                return (
+                  <TableRow key={row.id}>
+                    <TableCell className="font-medium">
+                      {row.product_name ?? "—"}
+                      {row.variant_name && (
+                        <span className="block text-xs text-muted-foreground">{row.variant_name}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="capitalize">{row.frequency ?? "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {range}
+                      {row.uom_code && range !== "—" && (
+                        <span className="ml-1 text-xs text-muted-foreground">{row.uom_code}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{row.current_supplier ?? "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {row.current_rate ? Number(row.current_rate).toLocaleString("en-PK") : "—"}
+                    </TableCell>
+                    <TableCell className="max-w-xs text-xs text-muted-foreground">
+                      {row.specification_notes ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" aria-label={`Edit ${row.product_name ?? "requirement"}`}
+                        onClick={() => openEdit(row)} disabled={save.isPending}>
+                        <Pencil className="h-3.5 w-3.5" aria-hidden />
+                      </Button>
+                      <Button variant="ghost" size="sm" aria-label={`Remove ${row.product_name ?? "requirement"}`}
+                        onClick={() => remove(row.id)} disabled={save.isPending}>
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}

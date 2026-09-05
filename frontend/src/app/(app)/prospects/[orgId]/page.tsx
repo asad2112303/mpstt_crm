@@ -13,7 +13,8 @@ import {
 import { ConvertDialog } from "@/components/convert-dialog";
 import { EditOrganizationDialog } from "@/components/edit-org-dialog";
 import {
-  ActivitiesTab, BranchesTab, ContactsTab, PricesTab, SamplesTab, TasksTab,
+  ActivitiesTab, BranchesTab, ContactsTab, PricesTab, RequirementsTab, SamplesTab,
+  TasksTab,
 } from "@/components/org-tabs";
 import { PageHeader } from "@/components/page-header";
 import { StageBadge } from "@/components/stage-badge";
@@ -170,6 +171,7 @@ export default function ProspectDetailPage({
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
           <TabsTrigger value="branches">Branches</TabsTrigger>
+          <TabsTrigger value="requirements">Requirements</TabsTrigger>
           <TabsTrigger value="activities">Activities</TabsTrigger>
           <TabsTrigger value="samples">Samples</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
@@ -178,6 +180,7 @@ export default function ProspectDetailPage({
         <TabsContent value="overview" className="pt-4"><OverviewTab org={org} /></TabsContent>
         <TabsContent value="contacts" className="pt-4"><ContactsTab orgId={orgId} /></TabsContent>
         <TabsContent value="branches" className="pt-4"><BranchesTab orgId={orgId} /></TabsContent>
+        <TabsContent value="requirements" className="pt-4"><RequirementsTab orgId={orgId} /></TabsContent>
         <TabsContent value="activities" className="pt-4"><ActivitiesTab orgId={orgId} /></TabsContent>
         <TabsContent value="samples" className="pt-4"><SamplesTab orgId={orgId} /></TabsContent>
         <TabsContent value="tasks" className="pt-4"><TasksTab orgId={orgId} /></TabsContent>

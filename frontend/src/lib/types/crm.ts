@@ -140,6 +140,11 @@ export interface ProductProfileRow {
   current_rate: string | null;
   specification_notes: string | null;
   is_active: boolean;
+  /** Resolved by the API so the list renders without a catalogue lookup. */
+  product_name: string | null;
+  product_sku: string | null;
+  variant_name: string | null;
+  uom_code: string | null;
 }
 
 export interface SampleRow {

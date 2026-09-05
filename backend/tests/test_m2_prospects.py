@@ -165,6 +165,52 @@ async def test_requirement_profiles_replace_and_advance_stage(client, user_heade
     assert resp.json()["data"]["prospect_profile"]["stage"] == "requirement_collected"
 
 
+async def test_requirement_profiles_carry_display_labels(client, user_headers, db_session):
+    """The requirements tab renders names, so the API resolves them server-side."""
+    from tests.test_m3_catalogue import seed_catalogue
+
+    admin_headers = auth_headers(await seed_profile(db_session, role="admin"))
+    ids = await seed_catalogue(client, admin_headers)
+    prospect = await create_prospect(client, user_headers)
+
+    resp = await client.post(
+        f"/api/v1/catalogue/products/{ids['product']['id']}/variants", headers=admin_headers,
+        json={"variant_code": f"V{uuid.uuid4().hex[:6]}", "variant_name": "Yellow 25 micron",
+              "attributes": {"colour": "Yellow", "thickness_micron": 25}},
+    )
+    assert resp.status_code == 201, resp.text
+    variant = resp.json()["data"]
+
+    await client.put(
+        f"/api/v1/prospects/{prospect['id']}/product-profiles", headers=user_headers,
+        json=[{
+            "product_id": ids["product"]["id"],
+            "product_variant_id": variant["id"],
+            "uom_id": ids["uom"]["id"],
+            "frequency": "monthly",
+            "min_quantity": "100",
+            "max_quantity": "500",
+        }],
+    )
+
+    resp = await client.get(
+        f"/api/v1/prospects/{prospect['id']}/product-profiles", headers=user_headers
+    )
+    assert resp.status_code == 200, resp.text
+    row = resp.json()["data"][0]
+    assert row["product_name"] == ids["product"]["name"]
+    assert row["product_sku"] == ids["product"]["sku"]
+    assert row["variant_name"] == variant["variant_name"]
+    assert row["uom_code"] == ids["uom"]["code"]
+
+    # Removing every requirement empties the list rather than erroring.
+    resp = await client.put(
+        f"/api/v1/prospects/{prospect['id']}/product-profiles", headers=user_headers, json=[]
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"] == []
+
+
 async def test_sample_lifecycle(client, user_headers, db_session):
     from tests.test_m3_catalogue import seed_catalogue
 

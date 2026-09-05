@@ -220,6 +220,12 @@ class ProductProfileOut(ProductProfileIn):
     id: uuid.UUID
     organization_id: uuid.UUID
     is_active: bool
+    # Resolved labels so the requirement list is readable without the client
+    # having to fetch the catalogue for every row.
+    product_name: str | None = None
+    product_sku: str | None = None
+    variant_name: str | None = None
+    uom_code: str | None = None
 
 
 class SampleIn(BaseModel):

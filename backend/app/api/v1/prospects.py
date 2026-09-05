@@ -12,6 +12,7 @@ from app.core.db import get_db
 from app.core.envelope import ok
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.core.security import CurrentUser, require_user
+from app.models.catalogue import Product, ProductVariant, UnitOfMeasure
 from app.models.organization import (
     Activity,
     Organization,
@@ -415,18 +416,38 @@ async def list_product_profiles(
 ) -> dict:
     await _get_org(db, organization_id)
     rows = (
-        (
-            await db.execute(
-                select(OrganizationProductProfile).where(
-                    OrganizationProductProfile.organization_id == organization_id,
-                    OrganizationProductProfile.is_active.is_(True),
-                )
+        await db.execute(
+            select(
+                OrganizationProductProfile,
+                Product.name,
+                Product.sku,
+                ProductVariant.variant_name,
+                UnitOfMeasure.code,
             )
+            .join(Product, Product.id == OrganizationProductProfile.product_id)
+            .outerjoin(
+                ProductVariant,
+                ProductVariant.id == OrganizationProductProfile.product_variant_id,
+            )
+            .outerjoin(
+                UnitOfMeasure, UnitOfMeasure.id == OrganizationProductProfile.uom_id
+            )
+            .where(
+                OrganizationProductProfile.organization_id == organization_id,
+                OrganizationProductProfile.is_active.is_(True),
+            )
+            .order_by(Product.name)
         )
-        .scalars()
-        .all()
-    )
-    return ok([ProductProfileOut.model_validate(p).model_dump(mode="json") for p in rows])
+    ).all()
+    out = []
+    for profile, product_name, sku, variant_name, uom_code in rows:
+        item = ProductProfileOut.model_validate(profile)
+        item.product_name = product_name
+        item.product_sku = sku
+        item.variant_name = variant_name
+        item.uom_code = uom_code
+        out.append(item.model_dump(mode="json"))
+    return ok(out)
 
 
 @router.put("/{organization_id}/product-profiles")

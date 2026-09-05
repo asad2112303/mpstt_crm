@@ -9,7 +9,8 @@ import { api, ApiError } from "@/lib/api";
 import { ORG_TYPE_LABELS, formatKarachi, type Organization } from "@/lib/types/crm";
 import { EditOrganizationDialog } from "@/components/edit-org-dialog";
 import {
-  ActivitiesTab, BranchesTab, ContactsTab, PricesTab, SamplesTab, TasksTab,
+  ActivitiesTab, BranchesTab, ContactsTab, PricesTab, RequirementsTab, SamplesTab,
+  TasksTab,
 } from "@/components/org-tabs";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -161,6 +162,7 @@ export default function CustomerDetailPage({
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
           <TabsTrigger value="branches">Branches</TabsTrigger>
+          <TabsTrigger value="requirements">Requirements</TabsTrigger>
           <TabsTrigger value="activities">Activities</TabsTrigger>
           <TabsTrigger value="samples">Samples</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
@@ -169,6 +171,7 @@ export default function CustomerDetailPage({
         <TabsContent value="timeline" className="pt-4"><TimelineTab orgId={orgId} /></TabsContent>
         <TabsContent value="contacts" className="pt-4"><ContactsTab orgId={orgId} /></TabsContent>
         <TabsContent value="branches" className="pt-4"><BranchesTab orgId={orgId} /></TabsContent>
+        <TabsContent value="requirements" className="pt-4"><RequirementsTab orgId={orgId} /></TabsContent>
         <TabsContent value="activities" className="pt-4"><ActivitiesTab orgId={orgId} /></TabsContent>
         <TabsContent value="samples" className="pt-4"><SamplesTab orgId={orgId} /></TabsContent>
         <TabsContent value="tasks" className="pt-4"><TasksTab orgId={orgId} /></TabsContent>
