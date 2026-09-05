@@ -87,7 +87,8 @@ export default function InvoiceDetailPage({
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <InvoiceStatusBadge status={invoice.derived_status} />
-            {invoice.pdf_document_id && (
+            {/* Issued invoices render their PDF from the frozen snapshot. */}
+            {invoice.status === "issued" && (
               <Button variant="outline" size="sm" onClick={() => void openPdf(invoice.id)}>
                 <FileDown className="mr-1 h-4 w-4" aria-hidden /> PDF
               </Button>

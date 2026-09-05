@@ -26,7 +26,7 @@ from app.models.organization import CustomerProfile, Organization
 from app.services.audit import write_audit
 from app.services.idempotency import require_idempotency_key, run_idempotent
 from app.services.numbering import allocate_number
-from app.services.pdf import render_pdf
+from app.services.pdf import freeze_context, render_html, render_pdf
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 
@@ -288,8 +288,8 @@ async def issue_invoice(
         invoice.issued_at = datetime.now(UTC)
         invoice.updated_by = uuid.UUID(user.id)
 
-        # Frozen PDF
-        from app.api.v1.documents import store_document
+        # Frozen document snapshot (see `freeze_context`): the PDF itself is
+        # rendered on demand, so issuing does not depend on object storage.
         from app.api.v1.quotations import _company_dict
 
         company = await _company_dict(db)
@@ -330,19 +330,11 @@ async def issue_invoice(
             order = await db.get(SalesOrder, invoice.sales_order_id)
             context["order_number"] = order.order_number if order else None
 
-        pdf_bytes = render_pdf("invoice.html", context)
-        doc = await store_document(
-            db, settings,
-            content=pdf_bytes,
-            filename=f"{invoice.invoice_number}.pdf",
-            claimed_mime="application/pdf",
-            entity_type="invoice",
-            entity_id=str(invoice.id),
-            document_type="invoice_pdf",
-            organization_id=invoice.organization_id,
-            uploaded_by=uuid.UUID(user.id),
-        )
-        invoice.pdf_document_id = doc.id
+        context = freeze_context(context)
+        # Render the HTML now so a broken template fails here rather than at
+        # download time, when the invoice is already issued.
+        render_html("invoice.html", context)
+        invoice.pdf_context = context
         await db.flush()
         await write_audit(db, action="invoice.issued", entity_type="invoice",
                           entity_id=invoice.id,
@@ -398,15 +390,21 @@ async def invoice_pdf(
     settings: Settings = Depends(get_settings),
 ):
     invoice = await _get_invoice(db, invoice_id)
-    if not invoice.pdf_document_id:
-        raise ConflictError("The invoice has not been issued yet.", code="INVOICE_NOT_ISSUED")
-    from app.models.documents import Document
-    from app.services.storage import get_storage
+    if invoice.pdf_context:
+        content = render_pdf("invoice.html", invoice.pdf_context)
+        filename = f"{invoice.invoice_number}.pdf"
+    elif invoice.pdf_document_id:
+        # Invoices issued before snapshots: still served from storage.
+        from app.models.documents import Document
+        from app.services.storage import get_storage
 
-    doc = await db.get(Document, invoice.pdf_document_id)
-    content = await get_storage(settings).get(doc.bucket, doc.storage_path)
+        doc = await db.get(Document, invoice.pdf_document_id)
+        content = await get_storage(settings).get(doc.bucket, doc.storage_path)
+        filename = doc.original_filename
+    else:
+        raise ConflictError("The invoice has not been issued yet.", code="INVOICE_NOT_ISSUED")
     return RawResponse(
         content=content, media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{doc.original_filename}"',
+        headers={"Content-Disposition": f'inline; filename="{filename}"',
                  "Cache-Control": "no-store"},
     )

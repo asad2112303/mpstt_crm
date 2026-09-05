@@ -43,6 +43,8 @@ class Invoice(Base, UUIDPKMixin, AuditedMixin):
     cancelled_reason: Mapped[str | None] = mapped_column(Text)
     issued_at: Mapped[datetime | None] = mapped_column()
     pdf_document_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # Frozen at issue: the exact inputs the invoice PDF is rendered from.
+    pdf_context: Mapped[dict | None] = mapped_column(JSONB)
 
     items: Mapped[list["InvoiceItem"]] = relationship(
         back_populates="invoice", lazy="selectin", order_by="InvoiceItem.sort_order",

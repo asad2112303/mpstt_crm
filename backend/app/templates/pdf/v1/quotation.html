@@ -185,13 +185,13 @@
     </tbody>
   </table>
 
-  {% if quote.discount_total > 0 or quote.tax_total > 0 %}
+  {% if quote.discount_total | num > 0 or quote.tax_total | num > 0 %}
   <table class="pretotals">
     <tr><td class="label" style="width:80%">Subtotal</td><td class="num">{{ quote.subtotal | money }}</td></tr>
-    {% if quote.discount_total > 0 %}
+    {% if quote.discount_total | num > 0 %}
     <tr><td class="label">Discount</td><td class="num">-{{ quote.discount_total | money }}</td></tr>
     {% endif %}
-    {% if quote.tax_total > 0 %}
+    {% if quote.tax_total | num > 0 %}
     <tr><td class="label">Tax</td><td class="num">{{ quote.tax_total | money }}</td></tr>
     {% endif %}
   </table>

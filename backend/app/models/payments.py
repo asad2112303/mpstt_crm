@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Numeric, String, Text, UniqueConstraint, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPKMixin
@@ -77,6 +77,8 @@ class Receipt(Base, UUIDPKMixin):
     )
     issued_at: Mapped[datetime] = mapped_column(server_default=text("now()"), nullable=False)
     pdf_document_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # Frozen when the receipt is issued; the PDF renders from this.
+    pdf_context: Mapped[dict | None] = mapped_column(JSONB)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
     payment: Mapped[Payment] = relationship(back_populates="receipt")

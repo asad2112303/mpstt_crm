@@ -30,7 +30,7 @@ from app.services.conversion import (
 from app.services.idempotency import require_idempotency_key, run_idempotent
 from app.services.money import sum_lines
 from app.services.numbering import allocate_number
-from app.services.pdf import render_pdf
+from app.services.pdf import freeze_context, render_html, render_pdf
 from app.services.prospects import advance_stage
 from app.services.quotations import (
     apply_totals,
@@ -309,22 +309,11 @@ async def send_quotation(
             if parent and parent.status in ("sent", "draft"):
                 parent.status = "superseded"
 
-        # Render + store the immutable PDF.
-        pdf_bytes = render_pdf("quotation.html", await pdf_context(db, quote, company))
-        from app.api.v1.documents import store_document
-
-        doc = await store_document(
-            db, settings,
-            content=pdf_bytes,
-            filename=f"{quote.quotation_number}-rev{quote.revision_no}.pdf",
-            claimed_mime="application/pdf",
-            entity_type="quotation",
-            entity_id=str(quote.id),
-            document_type="quotation_pdf",
-            organization_id=quote.organization_id,
-            uploaded_by=uuid.UUID(user.id),
-        )
-        quote.pdf_document_id = doc.id
+        # Freeze the exact inputs the PDF is rendered from. The file itself is
+        # produced on demand, so sending never depends on object storage.
+        frozen = freeze_context(await pdf_context(db, quote, company))
+        render_html("quotation.html", frozen)  # fail here, not at download
+        quote.pdf_context = frozen
 
         # Prospect stage moves forward automatically.
         profile = (
@@ -562,7 +551,11 @@ async def quotation_pdf(
 ):
     """Sent+: streams the frozen stored PDF. Draft: renders a live preview."""
     quote = await _get_quote(db, quotation_id)
-    if quote.pdf_document_id:
+    if quote.pdf_context:
+        content = render_pdf("quotation.html", quote.pdf_context)
+        filename = f"{quote.quotation_number}-rev{quote.revision_no}.pdf"
+    elif quote.pdf_document_id:
+        # Quotations sent before snapshots: still served from storage.
         from app.models.documents import Document
         from app.services.storage import get_storage
 

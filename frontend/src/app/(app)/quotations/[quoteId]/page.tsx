@@ -148,21 +148,24 @@ function DraftEditor({ quote }: { quote: Quote }) {
               <TableBody>
                 {lines.map((l, i) => (
                   <TableRow key={`${l.product_variant_id}-${i}`}>
-                    <TableCell className="text-sm">{l.label}</TableCell>
+                    <TableCell className="w-full min-w-32 whitespace-normal text-sm">{l.label}</TableCell>
                     <TableCell>
                       <Input type="number" min="0.001" step="any" value={l.quantity}
+                        className="w-20"
                         aria-label="Quantity"
                         onChange={(e) => setLines((p) =>
                           p.map((x, j) => j === i ? { ...x, quantity: e.target.value } : x))} />
                     </TableCell>
                     <TableCell>
                       <Input type="number" min="0" step="0.01" value={l.unit_price}
+                        className="w-24"
                         aria-label="Unit price"
                         onChange={(e) => setLines((p) =>
                           p.map((x, j) => j === i ? { ...x, unit_price: e.target.value } : x))} />
                     </TableCell>
                     <TableCell>
                       <Input type="number" min="0" max="100" step="0.01" value={l.discount_percent}
+                        className="w-20"
                         aria-label="Discount"
                         onChange={(e) => setLines((p) =>
                           p.map((x, j) => j === i ? { ...x, discount_percent: e.target.value } : x))} />
@@ -281,7 +284,7 @@ export default function QuoteDetailPage({
             <QuoteStatusBadge status={s} />
             <Button variant="outline" size="sm" onClick={() => void openPdf(quote.id)}>
               <FileDown className="mr-1 h-4 w-4" aria-hidden />
-              {quote.pdf_document_id ? "PDF" : "Preview PDF"}
+              {quote.status === "draft" ? "Preview PDF" : "PDF"}
             </Button>
             {s === "draft" && (
               <Button size="sm" disabled={act.isPending || quote.items.length === 0}

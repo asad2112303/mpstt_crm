@@ -58,7 +58,12 @@ async def test_send_freezes_quote_and_advances_stage(client, user_headers, db_se
 
     sent = await send(client, user_headers, quote["id"])
     assert sent["status"] == "sent"
-    assert sent["pdf_document_id"] is not None
+
+    # The PDF is rendered from the frozen snapshot, so it downloads without
+    # object storage being involved at all.
+    resp = await client.get(f"/api/v1/quotations/{quote['id']}/pdf", headers=user_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.content.startswith(b"%PDF-")
 
     # Sent quotes are immutable.
     resp = await client.put(

@@ -23,7 +23,7 @@ from app.services.audit import write_audit
 from app.services.idempotency import require_idempotency_key, run_idempotent
 from app.services.numbering import allocate_number
 from app.services.payments import allocate_payment, allocated_total, reverse_payment
-from app.services.pdf import render_pdf
+from app.services.pdf import freeze_context, render_html, render_pdf
 
 router = APIRouter(tags=["payments"])
 
@@ -270,19 +270,10 @@ async def create_receipt(
         "customer": {"name": org.name, "city": org.city},
         "allocations": invoice_numbers,
     }
-    pdf_bytes = render_pdf("receipt.html", context)
-    from app.api.v1.documents import store_document
-
-    doc = await store_document(
-        db, settings, content=pdf_bytes,
-        filename=f"{receipt.receipt_number}.pdf",
-        claimed_mime="application/pdf",
-        entity_type="receipt", entity_id=str(receipt.id),
-        document_type="receipt_pdf",
-        organization_id=payment.organization_id,
-        uploaded_by=uuid.UUID(user.id),
-    )
-    receipt.pdf_document_id = doc.id
+    # Frozen inputs; the PDF renders on demand rather than being uploaded.
+    context = freeze_context(context)
+    render_html("receipt.html", context)  # fail here, not at download
+    receipt.pdf_context = context
     await db.flush()
     await write_audit(db, action="receipt.issued", entity_type="receipt",
                       entity_id=receipt.id, new={"number": receipt.receipt_number})
@@ -298,16 +289,23 @@ async def receipt_pdf(
     settings: Settings = Depends(get_settings),
 ):
     payment = await _get_payment(db, payment_id)
-    if payment.receipt is None or payment.receipt.pdf_document_id is None:
+    receipt = payment.receipt
+    if receipt is None or (receipt.pdf_context is None and receipt.pdf_document_id is None):
         raise NotFoundError("No receipt has been issued for this payment.")
-    from app.models.documents import Document
-    from app.services.storage import get_storage
+    if receipt.pdf_context:
+        content = render_pdf("receipt.html", receipt.pdf_context)
+        filename = f"{receipt.receipt_number}.pdf"
+    else:
+        # Receipts issued before snapshots: still served from storage.
+        from app.models.documents import Document
+        from app.services.storage import get_storage
 
-    doc = await db.get(Document, payment.receipt.pdf_document_id)
-    content = await get_storage(settings).get(doc.bucket, doc.storage_path)
+        doc = await db.get(Document, receipt.pdf_document_id)
+        content = await get_storage(settings).get(doc.bucket, doc.storage_path)
+        filename = doc.original_filename
     return RawResponse(
         content=content, media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{doc.original_filename}"',
+        headers={"Content-Disposition": f'inline; filename="{filename}"',
                  "Cache-Control": "no-store"},
     )
 

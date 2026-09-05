@@ -59,6 +59,8 @@ class Quotation(Base, UUIDPKMixin, AuditedMixin):
     tax_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, server_default=text("0"))
     grand_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, server_default=text("0"))
     pdf_document_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # Frozen when the quotation is sent; the PDF renders from this.
+    pdf_context: Mapped[dict | None] = mapped_column(JSONB)
     sent_at: Mapped[datetime | None] = mapped_column()
     accepted_at: Mapped[datetime | None] = mapped_column()
     rejected_reason: Mapped[str | None] = mapped_column(Text)

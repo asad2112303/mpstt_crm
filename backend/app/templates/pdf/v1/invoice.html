@@ -143,13 +143,13 @@
     </tbody>
   </table>
 
-  {% if invoice.discount_total > 0 or invoice.tax_total > 0 %}
+  {% if invoice.discount_total | num > 0 or invoice.tax_total | num > 0 %}
   <table class="pretotals">
     <tr><td class="label" style="width:80%">Subtotal</td><td class="num">{{ invoice.subtotal | money }}</td></tr>
-    {% if invoice.discount_total > 0 %}
+    {% if invoice.discount_total | num > 0 %}
     <tr><td class="label">Discount</td><td class="num">-{{ invoice.discount_total | money }}</td></tr>
     {% endif %}
-    {% if invoice.tax_total > 0 %}
+    {% if invoice.tax_total | num > 0 %}
     <tr><td class="label">Tax</td><td class="num">{{ invoice.tax_total | money }}</td></tr>
     {% endif %}
   </table>

@@ -72,7 +72,9 @@ async def test_invoice_lifecycle_from_order(client, user_headers, admin_headers,
     assert issued["status"] == "issued"
     expected_due = date.today() + timedelta(days=45)
     assert issued["due_date"] == expected_due.isoformat()
-    assert issued["pdf_document_id"]
+    resp = await client.get(f"/api/v1/invoices/{invoice['id']}/pdf", headers=user_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.content.startswith(b"%PDF-")
     assert issued["outstanding"] == issued["grand_total"]
     assert issued["derived_status"] == "issued"
 
@@ -160,3 +162,76 @@ async def test_cancel_rules(client, user_headers, admin_headers, db_session):
         json={"sales_order_id": data["order"]["id"]},
     )
     assert resp.status_code == 201
+
+
+async def test_issue_and_download_do_not_touch_object_storage(
+    client, user_headers, admin_headers, db_session, monkeypatch
+):
+    """Issuing used to upload the PDF, so an unreachable bucket blocked billing.
+
+    The document is now frozen as a render context on the invoice and the file
+    is produced on demand, so both operations work with storage broken.
+    """
+    import app.services.storage as storage_module
+
+    def explode(*args, **kwargs):
+        raise AssertionError("object storage must not be used for generated PDFs")
+
+    monkeypatch.setattr(storage_module, "get_storage", explode)
+
+    data = await confirmed_order(client, user_headers, admin_headers, db_session)
+    resp = await client.post(
+        "/api/v1/invoices/from-order", headers=user_headers,
+        json={"sales_order_id": data["order"]["id"]},
+    )
+    assert resp.status_code == 201, resp.text
+    invoice = resp.json()["data"]
+
+    resp = await client.post(
+        f"/api/v1/invoices/{invoice['id']}/issue",
+        headers={**user_headers, "Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert resp.status_code == 200, resp.text
+    issued = resp.json()["data"]
+    assert issued["status"] == "issued"
+
+    resp = await client.get(f"/api/v1/invoices/{invoice['id']}/pdf", headers=user_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.content.startswith(b"%PDF-")
+    assert issued["invoice_number"] in resp.headers["content-disposition"]
+
+
+async def test_issued_invoice_pdf_ignores_later_company_edits(
+    client, user_headers, admin_headers, db_session
+):
+    """An issued invoice is immutable: its PDF must not pick up later changes."""
+    from app.services.pdf import render_html
+
+    data = await confirmed_order(client, user_headers, admin_headers, db_session)
+    resp = await client.post(
+        "/api/v1/invoices/from-order", headers=user_headers,
+        json={"sales_order_id": data["order"]["id"]},
+    )
+    invoice = resp.json()["data"]
+    resp = await client.post(
+        f"/api/v1/invoices/{invoice['id']}/issue",
+        headers={**user_headers, "Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = await client.put(
+        "/api/v1/admin/settings", headers=admin_headers,
+        json={"company_name": "Renamed After Issue (Pvt) Ltd"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    from sqlalchemy import select
+
+    from app.models.invoices import Invoice
+
+    row = (
+        await db_session.execute(select(Invoice).where(Invoice.id == uuid.UUID(invoice["id"])))
+    ).scalar_one()
+    await db_session.refresh(row)
+    html = render_html("invoice.html", row.pdf_context)
+    assert "Renamed After Issue" not in html

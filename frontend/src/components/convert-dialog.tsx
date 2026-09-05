@@ -150,21 +150,24 @@ export function ConvertDialog({ orgId, orgName }: { orgId: string; orgName: stri
                 <TableBody>
                   {lines.map((l, i) => (
                     <TableRow key={`${l.hit.variant_id}-${i}`}>
-                      <TableCell className="text-sm">{l.hit.label}</TableCell>
+                      <TableCell className="w-full min-w-32 whitespace-normal text-sm">{l.hit.label}</TableCell>
                       <TableCell>
                         <Input type="number" min="0.001" step="any" value={l.quantity}
+                          className="w-20"
                           aria-label="Quantity"
                           onChange={(e) => setLines((prev) =>
                             prev.map((x, j) => j === i ? { ...x, quantity: e.target.value } : x))} />
                       </TableCell>
                       <TableCell>
                         <Input type="number" min="0" step="0.01" value={l.unit_price}
+                          className="w-24"
                           aria-label="Unit price"
                           onChange={(e) => setLines((prev) =>
                             prev.map((x, j) => j === i ? { ...x, unit_price: e.target.value } : x))} />
                       </TableCell>
                       <TableCell>
                         <Input type="number" min="0" max="100" step="0.01" value={l.discount_percent}
+                          className="w-20"
                           aria-label="Discount percent"
                           onChange={(e) => setLines((prev) =>
                             prev.map((x, j) => j === i ? { ...x, discount_percent: e.target.value } : x))} />
