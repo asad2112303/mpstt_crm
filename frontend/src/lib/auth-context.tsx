@@ -32,20 +32,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   async function signOut() {
-    // Never let a failed provider call trap the user in the app: an expired or
-    // already-revoked session makes a global sign-out return 403, and the old
-    // code then threw before navigating. Clear locally, always continue.
+    // Clear the browser-held session first (best effort), then hand over to the
+    // server route, which deletes the cookie the middleware actually reads and
+    // redirects. Doing it server-side is what makes sign-out reliable: a
+    // surviving cookie would bounce /login straight back to /dashboard.
     try {
       if (supabaseConfigured()) {
-        await createClient().auth.signOut({ scope: "local" });
+        // Best effort: revoke the refresh token server-side. This fails with
+        // 403 on an already-expired session, which must not block signing out.
+        await createClient().auth.signOut({ scope: "global" });
       }
     } catch {
-      // Session was already invalid — the local cookies are cleared regardless.
+      // Session already invalid — continue; the server clears it regardless.
     }
     queryClient.clear(); // drop cached CRM data so the next user starts clean
-    // Full page load, so middleware re-evaluates with the cleared cookies
-    // instead of a client-side transition reusing cached state.
-    window.location.assign("/login");
+    window.location.assign("/auth/signout");
   }
 
   return (
