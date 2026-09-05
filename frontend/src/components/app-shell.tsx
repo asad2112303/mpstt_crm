@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -198,12 +199,16 @@ function UserMenu() {
         <span className="hidden sm:inline">{me.full_name}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>
-          <p>{me.full_name}</p>
-          <p className="text-xs font-normal text-muted-foreground">
-            {me.email} · {me.role === "admin" ? "Admin" : "Operational user"}
-          </p>
-        </DropdownMenuLabel>
+        {/* GroupLabel is only valid inside a Group — without it Base UI throws
+            when the menu opens, which took the Sign out item down with it. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>
+            <p>{me.full_name}</p>
+            <p className="text-xs font-normal text-muted-foreground">
+              {me.email} · {me.role === "admin" ? "Admin" : "Operational user"}
+            </p>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => void signOut()}>
           <LogOut className="mr-2 h-4 w-4" aria-hidden />
