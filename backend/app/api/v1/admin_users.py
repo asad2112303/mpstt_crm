@@ -3,6 +3,7 @@ import uuid
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -14,6 +15,7 @@ from app.models.access import UserProfile
 from app.schemas.access import InviteUserIn, UpdateUserIn, UserProfileOut
 from app.services import supabase_admin
 from app.services.audit import write_audit
+from app.services.passwords import generate_password
 
 router = APIRouter(prefix="/admin/users", tags=["admin"])
 
@@ -42,7 +44,15 @@ async def invite_user(
     if existing:
         raise ConflictError("A profile with this email already exists.", code="DUPLICATE_EMAIL")
 
-    auth_user_id = await supabase_admin.invite_user(settings, payload.email)
+    temp_password: str | None = None
+    if payload.mode == "password":
+        temp_password = payload.password or generate_password()
+        auth_user_id = await supabase_admin.create_user_with_password(
+            settings, payload.email, temp_password
+        )
+    else:
+        auth_user_id = await supabase_admin.invite_user(settings, payload.email)
+
     profile = UserProfile(
         id=auth_user_id,
         full_name=payload.full_name,
@@ -50,16 +60,25 @@ async def invite_user(
         role=payload.role,
     )
     db.add(profile)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        raise ConflictError(
+            "This login already has a CRM profile.", code="PROFILE_EXISTS"
+        ) from exc
     await write_audit(
         db,
         action="user.invited",
         entity_type="user_profile",
         entity_id=profile.id,
-        new={"email": payload.email, "role": payload.role},
+        # The password itself is never audited or logged.
+        new={"email": payload.email, "role": payload.role, "mode": payload.mode},
     )
     await db.commit()
-    return ok(UserProfileOut.model_validate(profile).model_dump(mode="json"))
+    data = UserProfileOut.model_validate(profile).model_dump(mode="json")
+    # Shown once to the admin so they can pass it on; never stored by the CRM.
+    data["temporary_password"] = temp_password
+    return ok(data)
 
 
 @router.patch("/{user_id}")

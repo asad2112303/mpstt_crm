@@ -115,3 +115,57 @@ async def test_mfa_gate_blocks_aal1_admin_when_required():
 
     admin_aal2 = CurrentUser(id=new_id(), email=None, role="admin", aal="aal2", full_name="A")
     assert await require_admin_mfa(user=admin_aal2, settings=settings) is admin_aal2
+
+
+async def test_admin_can_create_user_with_password(client, db_session):
+    """The reliable path: no email delivery involved, password returned once."""
+    admin_id = await seed_profile(db_session, role="admin")
+    headers = auth_headers(admin_id)
+
+    resp = await client.post(
+        "/api/v1/admin/users/invite",
+        headers=headers,
+        json={
+            "email": f"pw-{new_id()[:8]}@mpstt.pk",
+            "full_name": "Password User",
+            "role": "user",
+            "mode": "password",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()["data"]
+    assert data["role"] == "user"
+    assert data["is_active"] is True
+    # A one-time password is handed back for the admin to pass on.
+    assert data["temporary_password"]
+    assert len(data["temporary_password"]) >= 12
+
+
+async def test_invite_mode_returns_no_password(client, db_session):
+    admin_id = await seed_profile(db_session, role="admin")
+    resp = await client.post(
+        "/api/v1/admin/users/invite",
+        headers=auth_headers(admin_id),
+        json={
+            "email": f"inv-{new_id()[:8]}@mpstt.pk",
+            "full_name": "Invited User",
+            "role": "user",
+            "mode": "invite",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["data"]["temporary_password"] is None
+
+
+async def test_generated_password_is_strong_and_unique():
+    from app.services.passwords import generate_password
+
+    passwords = {generate_password() for _ in range(50)}
+    assert len(passwords) == 50, "generated passwords must not repeat"
+    for pw in passwords:
+        assert len(pw) == 16
+        assert any(c.isdigit() for c in pw)
+        assert any(c.isupper() for c in pw)
+        assert any(c.islower() for c in pw)
+        # Ambiguous characters are excluded so credentials can be read aloud.
+        assert not (set(pw) & set("O0lI1"))

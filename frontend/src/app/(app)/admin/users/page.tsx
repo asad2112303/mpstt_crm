@@ -54,23 +54,30 @@ function InviteDialog() {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<"admin" | "user">("user");
+  const [mode, setMode] = useState<"password" | "invite">("password");
+  const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
 
   const invite = useMutation({
     mutationFn: () =>
-      api("/api/v1/admin/users/invite", {
-        method: "POST",
-        body: { email, full_name: fullName, role },
-      }),
-    onSuccess: () => {
-      toast.success(`Invitation created for ${email}`);
+      api<UserRow & { temporary_password: string | null }>(
+        "/api/v1/admin/users/invite",
+        { method: "POST", body: { email, full_name: fullName, role, mode } },
+      ),
+    onSuccess: (resp) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-      setOpen(false);
+      const password = resp.data.temporary_password;
+      if (password) {
+        setCreated({ email, password }); // shown once; the CRM never stores it
+      } else {
+        toast.success(`Invitation email sent to ${email}`);
+        setOpen(false);
+      }
       setEmail("");
       setFullName("");
       setRole("user");
     },
     onError: (err) =>
-      toast.error(err instanceof ApiError ? err.message : "Invitation failed."),
+      toast.error(err instanceof ApiError ? err.message : "Could not add the user."),
   });
 
   return (
@@ -83,12 +90,44 @@ function InviteDialog() {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Invite a user</DialogTitle>
+          <DialogTitle>{created ? "User created" : "Add a user"}</DialogTitle>
           <DialogDescription>
-            The user receives a Supabase Auth invitation email. No public
-            signup exists.
+            {created
+              ? "Copy these credentials now — the password is shown only once."
+              : "There is no public signup: accounts are created here by an administrator."}
           </DialogDescription>
         </DialogHeader>
+        {created ? (
+          <div className="space-y-3">
+            <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
+              <p className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Email</span>
+                <span className="font-medium">{created.email}</span>
+              </p>
+              <p className="mt-1 flex justify-between gap-4">
+                <span className="text-muted-foreground">Temporary password</span>
+                <span className="font-mono font-medium">{created.password}</span>
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Share these over a trusted channel and ask the user to change the
+              password after signing in. The CRM never stores it.
+            </p>
+            <DialogFooter>
+              <Button variant="outline"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(
+                    `${created.email} / ${created.password}`,
+                  );
+                  toast.success("Credentials copied");
+                }}>
+                Copy
+              </Button>
+              <Button onClick={() => { setCreated(null); setOpen(false); }}>Done</Button>
+            </DialogFooter>
+          </div>
+        ) : (
+        <>
         <form
           className="space-y-4"
           onSubmit={(e) => {
@@ -128,12 +167,34 @@ function InviteDialog() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="invite-mode">How should they get access?</Label>
+            <Select value={mode}
+              onValueChange={(v) => setMode((v as "password" | "invite") ?? "password")}>
+              <SelectTrigger id="invite-mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="password">Set a password now (recommended)</SelectItem>
+                <SelectItem value="invite">Send an invitation email</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {mode === "password"
+                ? "Creates the login immediately and shows a one-time password to hand over — no email delivery needed."
+                : "Needs working email delivery in the Supabase project; the built-in sender is rate limited."}
+            </p>
+          </div>
           <DialogFooter>
             <Button type="submit" disabled={invite.isPending || !email || !fullName}>
-              {invite.isPending ? "Inviting…" : "Send invitation"}
+              {invite.isPending
+                ? "Adding…"
+                : mode === "password" ? "Create user" : "Send invitation"}
             </Button>
           </DialogFooter>
         </form>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   );

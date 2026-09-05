@@ -29,6 +29,10 @@ class InviteUserIn(BaseModel):
     email: EmailStr
     full_name: str = Field(min_length=2, max_length=150)
     role: str = Field(pattern="^(admin|user)$")
+    # "invite" emails a link (needs working SMTP); "password" creates the login
+    # directly and returns a one-time password for the admin to hand over.
+    mode: str = Field(default="invite", pattern="^(invite|password)$")
+    password: str | None = Field(default=None, min_length=10, max_length=72)
 
 
 class UpdateUserIn(BaseModel):
