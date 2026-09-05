@@ -116,7 +116,7 @@ export function ConvertDialog({ orgId, orgName }: { orgId: string; orgName: stri
       <DialogTrigger className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
         <ArrowRightCircle className="h-4 w-4" aria-hidden /> First order / convert
       </DialogTrigger>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>First order — convert {orgName} to customer</DialogTitle>
           <DialogDescription>

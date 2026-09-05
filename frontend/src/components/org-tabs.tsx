@@ -366,7 +366,7 @@ export function ActivitiesTab({ orgId }: { orgId: string }) {
         <DialogTrigger className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-card px-3 text-sm hover:bg-muted">
           <Plus className="h-3.5 w-3.5" aria-hidden /> Record activity
         </DialogTrigger>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Record activity</DialogTitle></DialogHeader>
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
             <div className="space-y-1.5">
@@ -938,7 +938,7 @@ export function RequirementsTab({ orgId }: { orgId: string }) {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit requirement" : "Add requirement"}</DialogTitle>
           </DialogHeader>

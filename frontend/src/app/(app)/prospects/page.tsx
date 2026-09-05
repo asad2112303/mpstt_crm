@@ -88,7 +88,7 @@ function NewProspectDialog() {
       <DialogTrigger className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
         <Plus className="h-4 w-4" aria-hidden /> New prospect
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader><DialogTitle>New prospect</DialogTitle></DialogHeader>
         <form
           className="grid gap-4 sm:grid-cols-2"

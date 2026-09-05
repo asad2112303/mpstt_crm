@@ -60,7 +60,7 @@ function NewProductDialog({ categories, brands, uoms }: {
       <DialogTrigger className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
         <PackagePlus className="h-4 w-4" aria-hidden /> New product
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader><DialogTitle>New product</DialogTitle></DialogHeader>
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
           <div className="space-y-1.5">

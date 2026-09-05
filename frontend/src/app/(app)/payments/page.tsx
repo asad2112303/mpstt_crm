@@ -212,7 +212,7 @@ function AllocateDialog({ payment }: { payment: PaymentRow }) {
       <DialogTrigger className="inline-flex h-7 items-center rounded-md border border-border bg-card px-2.5 text-[0.8rem] hover:bg-muted">
         Allocate
       </DialogTrigger>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>
             Allocate {payment.payment_number} — unallocated PKR {payment.unallocated}

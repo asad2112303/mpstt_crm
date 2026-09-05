@@ -62,7 +62,7 @@ export function EditOrganizationDialog({ org }: { org: Organization }) {
         <Pencil className="mr-1 h-3.5 w-3.5" aria-hidden /> Edit details
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Edit {org.org_code}</DialogTitle></DialogHeader>
           <form
             className="grid gap-3 sm:grid-cols-2"
