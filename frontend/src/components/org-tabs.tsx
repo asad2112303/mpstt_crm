@@ -1071,10 +1071,14 @@ export function RequirementsTab({ orgId }: { orgId: string }) {
                     <TableCell className="text-right tabular-nums">
                       {row.current_rate ? Number(row.current_rate).toLocaleString("en-PK") : "—"}
                     </TableCell>
-                    <TableCell className="max-w-xs text-xs text-muted-foreground">
-                      {row.specification_notes ?? "—"}
+                    <TableCell className="text-xs text-muted-foreground">
+                      {/* Migration notes run long; clamp so they cannot slide
+                          under the action buttons. */}
+                      <span className="line-clamp-2 max-w-[22rem]" title={row.specification_notes ?? undefined}>
+                        {row.specification_notes ?? "—"}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" aria-label={`Edit ${row.product_name ?? "requirement"}`}
                         onClick={() => openEdit(row)} disabled={save.isPending}>
                         <Pencil className="h-3.5 w-3.5" aria-hidden />
