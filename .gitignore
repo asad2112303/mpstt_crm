@@ -46,3 +46,4 @@ frontend/playwright-report/
 
 # Migration source workbook (business data archive — never commit)
 MPSTT_CRM/
+backups/
