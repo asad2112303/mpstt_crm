@@ -284,3 +284,37 @@ async def test_warehouse_editable_by_admin(client, user_headers, admin_headers):
         json={"code": wh["code"], "name": "X", "is_active": True},
     )
     assert resp.status_code == 403
+
+
+async def test_retired_empty_variant_drops_off_balances(client, admin_headers, user_headers, db_session):
+    """A deactivated variant should not linger as a zero row on the balances list."""
+    from tests.test_m4_conversion import make_sellable_variant
+
+    variant = await make_sellable_variant(client, db_session)
+    wh = await ensure_warehouse(client, admin_headers)
+    await stock_up(client, admin_headers, wh["id"], variant["id"], "10")
+
+    def rows():
+        return client.get("/api/v1/inventory/balances", headers=user_headers)
+
+    listed = (await rows()).json()["data"]
+    assert any(r["product_variant_id"] == variant["id"] for r in listed)
+
+    # Retired but still holding stock: must stay visible so it can be cleared.
+    resp = await client.patch(
+        f"/api/v1/catalogue/variants/{variant['id']}", headers=admin_headers,
+        json={"is_active": False},
+    )
+    assert resp.status_code == 200, resp.text
+    listed = (await rows()).json()["data"]
+    assert any(r["product_variant_id"] == variant["id"] for r in listed)
+
+    # Emptied as well: now it disappears.
+    resp = await client.post(
+        "/api/v1/inventory/adjustments", headers=admin_headers,
+        json={"warehouse_id": wh["id"], "product_variant_id": variant["id"],
+              "quantity": "-10", "reason": "Merged into another line"},
+    )
+    assert resp.status_code == 201, resp.text
+    listed = (await rows()).json()["data"]
+    assert not any(r["product_variant_id"] == variant["id"] for r in listed)

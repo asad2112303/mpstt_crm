@@ -96,7 +96,9 @@ async def stock_balances(
     user: CurrentUser = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    conditions = ["1=1"]
+    # A retired variant that still holds stock stays visible — you need to see
+    # it to clear it. Once it is empty it drops off the list for good.
+    conditions = ["(v.variant_is_active OR v.on_hand <> 0 OR v.reserved <> 0)"]
     params: dict = {}
     if warehouse_id:
         conditions.append("v.warehouse_id = :wh")
