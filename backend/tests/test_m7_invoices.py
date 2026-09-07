@@ -48,7 +48,9 @@ async def test_invoice_lifecycle_from_order(client, user_headers, admin_headers,
     assert resp.status_code == 201, resp.text
     invoice = resp.json()["data"]
     assert invoice["status"] == "draft"
-    assert invoice["invoice_number"] is None
+    # Numbered from the moment the draft exists, so it can be referred to
+    # before it is issued.
+    assert invoice["invoice_number"].startswith("INV-")
     assert invoice["grand_total"] == order["grand_total"]
     # Terms came from the customer profile created at conversion (45 days).
     assert invoice["payment_terms_days"] == 45
@@ -68,7 +70,7 @@ async def test_invoice_lifecycle_from_order(client, user_headers, admin_headers,
     )
     assert resp.status_code == 200, resp.text
     issued = resp.json()["data"]
-    assert issued["invoice_number"].startswith("INV-")
+    assert issued["invoice_number"] == invoice["invoice_number"], "issuing must keep the number"
     assert issued["status"] == "issued"
     expected_due = date.today() + timedelta(days=45)
     assert issued["due_date"] == expected_due.isoformat()

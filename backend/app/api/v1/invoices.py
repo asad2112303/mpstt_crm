@@ -214,6 +214,10 @@ async def create_from_order(
     terms = profile.payment_terms_days if profile else 30
 
     invoice = Invoice(
+        # Numbered on creation so the draft is identifiable straight away.
+        # A cancelled draft therefore leaves a gap in the sequence, which is
+        # the accepted trade-off for having a number to refer to.
+        invoice_number=await allocate_number(db, "INV"),
         organization_id=order.organization_id,
         sales_order_id=order.id,
         payment_terms_days=terms,
@@ -283,7 +287,8 @@ async def issue_invoice(
         invoice.invoice_date = today
         if invoice.due_date is None:
             invoice.due_date = today + timedelta(days=invoice.payment_terms_days)
-        invoice.invoice_number = await allocate_number(db, "INV")
+        if invoice.invoice_number is None:  # drafts created before numbering moved
+            invoice.invoice_number = await allocate_number(db, "INV")
         invoice.status = "issued"
         invoice.issued_at = datetime.now(UTC)
         invoice.updated_by = uuid.UUID(user.id)
