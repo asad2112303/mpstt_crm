@@ -34,6 +34,35 @@ BEGIN
     END IF;
 END $$;
 
+-- Website intake: public.quotation_requests (created from
+-- supabase/sql/quotation_requests.sql, outside Alembic because it belongs to
+-- the website). The website inserts through /api/quote with the Supabase
+-- secret key; the CRM only reads the queue and moves it along, so the runtime
+-- role gets SELECT plus UPDATE on the three workflow columns and nothing else
+-- — it cannot rewrite what the customer submitted, and cannot INSERT/DELETE.
+--
+-- RLS is enabled on that table with no policies, which denies every role that
+-- cannot bypass RLS, crm_app included. Grants alone would leave the inbox
+-- silently empty, so crm_app also needs its own policies. These are scoped to
+-- crm_app by name: anon and authenticated stay fully denied.
+DO $$
+BEGIN
+    IF to_regclass('public.quotation_requests') IS NOT NULL THEN
+        GRANT USAGE ON SCHEMA public TO crm_app;
+        GRANT SELECT ON public.quotation_requests TO crm_app;
+        GRANT UPDATE (status, internal_notes, contacted_at)
+            ON public.quotation_requests TO crm_app;
+
+        DROP POLICY IF EXISTS crm_app_select ON public.quotation_requests;
+        CREATE POLICY crm_app_select ON public.quotation_requests
+            FOR SELECT TO crm_app USING (true);
+
+        DROP POLICY IF EXISTS crm_app_update ON public.quotation_requests;
+        CREATE POLICY crm_app_update ON public.quotation_requests
+            FOR UPDATE TO crm_app USING (true) WITH CHECK (true);
+    END IF;
+END $$;
+
 -- The runtime role must not create objects anywhere.
 REVOKE CREATE ON SCHEMA crm FROM crm_app;
 REVOKE CREATE ON SCHEMA public FROM crm_app;

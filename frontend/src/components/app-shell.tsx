@@ -11,6 +11,7 @@ import {
   Building2,
   ClipboardList,
   FileText,
+  Inbox,
   Layers,
   LayoutDashboard,
   LogOut,
@@ -62,6 +63,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: "Sales",
     items: [
+      { href: "/quotation-requests", label: "Quotation requests", icon: Inbox },
       { href: "/prospects", label: "Prospects", icon: Building2 },
       { href: "/customers", label: "Customers", icon: Users },
       { href: "/quotations", label: "Quotations", icon: FileText },

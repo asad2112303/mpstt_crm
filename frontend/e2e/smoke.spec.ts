@@ -13,7 +13,13 @@ test.describe("MPSTT CRM shell smoke", () => {
   });
 
   test("app pages render their shells (backend offline tolerated)", async ({ page }) => {
-    for (const path of ["/dashboard", "/prospects", "/quotations", "/inventory"]) {
+    for (const path of [
+      "/dashboard",
+      "/prospects",
+      "/quotation-requests",
+      "/quotations",
+      "/inventory",
+    ]) {
       await page.goto(path);
       // Sidebar brand always present; page must not white-screen.
       await expect(page.getByText("Prospect to payment")).toBeVisible();

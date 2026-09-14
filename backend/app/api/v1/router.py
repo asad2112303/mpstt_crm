@@ -15,6 +15,7 @@ from app.api.v1 import (
     organizations,
     payments,
     prospects,
+    quotation_requests,
     quotations,
     reports,
     settings,
@@ -30,6 +31,7 @@ api_router.include_router(customers.router)
 api_router.include_router(documents.router)
 api_router.include_router(settings.router)
 api_router.include_router(quotations.router)
+api_router.include_router(quotation_requests.router)
 api_router.include_router(orders.router)
 api_router.include_router(inventory.router)
 api_router.include_router(invoices.router)

@@ -11,5 +11,6 @@ from app.models import (  # noqa: F401
     organization,
     payments,
     quotes,
+    website,
 )
 from app.models.base import Base  # noqa: F401
