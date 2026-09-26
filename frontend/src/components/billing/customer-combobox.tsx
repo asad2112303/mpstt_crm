@@ -107,7 +107,7 @@ export function CustomerCombobox({
   const [query, setQuery] = useState("");
   const boxRef = useRef<HTMLDivElement>(null);
 
-  const { data } = useQuery({
+  const { data, error } = useQuery({
     queryKey: ["billing-customers", query],
     queryFn: async () =>
       (
@@ -183,7 +183,13 @@ export function CustomerCombobox({
                   </button>
                 </li>
               ))}
-              {results.length === 0 && (
+              {error && (
+                <li className="px-3 py-2 text-sm text-destructive">
+                  Could not load customers:{" "}
+                  {error instanceof ApiError ? error.message : "the server could not be reached."}
+                </li>
+              )}
+              {results.length === 0 && !error && (
                 <li className="px-3 py-2 text-sm text-muted-foreground">
                   {query ? "No matching customer." : "Start typing to search."}
                 </li>

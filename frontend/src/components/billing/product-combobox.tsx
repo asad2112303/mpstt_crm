@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Check, Package, PackageX, Plus } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import {
   narrow,
   type BillingProduct, type CatalogueProduct, type CatalogueVariant,
@@ -193,7 +193,7 @@ export function ProductCombobox({
   const boxRef = useRef<HTMLDivElement>(null);
 
   const query = typedName.trim();
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, error } = useQuery({
     queryKey: ["billing-catalogue", { query, onlyTracked, warehouseId }],
     queryFn: async () =>
       (
@@ -449,7 +449,19 @@ export function ProductCombobox({
                   </li>
                 );
               })}
-              {results.length === 0 && !isFetching && (
+              {/* A failed request is not an empty catalogue: saying "no
+                  products" for a 500 sends people hunting for missing data. */}
+              {error && (
+                <li className="px-3 py-2 text-sm text-destructive">
+                  <p className="font-medium">Could not load products.</p>
+                  <p className="mt-0.5 text-xs">
+                    {error instanceof ApiError
+                      ? `${error.message}${error.status >= 500 ? " (server error)" : ""}`
+                      : "The server could not be reached."}
+                  </p>
+                </li>
+              )}
+              {results.length === 0 && !isFetching && !error && (
                 <li className="px-3 py-2 text-sm text-muted-foreground">
                   {query ? "No matching product." : "Start typing to search."}
                 </li>
