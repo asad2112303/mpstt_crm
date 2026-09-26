@@ -18,6 +18,8 @@ test.describe("MPSTT CRM shell smoke", () => {
       "/prospects",
       "/quotation-requests",
       "/quotations",
+      "/create-bill",
+      "/products",
       "/inventory",
     ]) {
       await page.goto(path);

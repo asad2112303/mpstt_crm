@@ -12,6 +12,7 @@ import {
   ClipboardList,
   FileText,
   Inbox,
+  Zap,
   Layers,
   LayoutDashboard,
   LogOut,
@@ -58,7 +59,10 @@ export interface NavSection {
 /** Navigation grows as modules ship. */
 export const NAV_SECTIONS: NavSection[] = [
   {
-    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/create-bill", label: "Create Bill", icon: Zap },
+    ],
   },
   {
     title: "Sales",
@@ -90,7 +94,8 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: "Catalogue",
     items: [
-      { href: "/catalogue", label: "Products", icon: Package },
+      { href: "/products", label: "Products & Inventory", icon: Package },
+      { href: "/catalogue", label: "Catalogue", icon: Boxes },
       { href: "/catalogue/master", label: "Master data", icon: Layers, adminOnly: true },
     ],
   },

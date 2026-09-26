@@ -9,6 +9,7 @@ from decimal import Decimal
 from sqlalchemy import (
     CheckConstraint,
     ForeignKey,
+    Index,
     Numeric,
     SmallInteger,
     String,
@@ -61,6 +62,10 @@ class Product(Base, UUIDPKMixin, AuditedMixin):
             "lot_tracking_mode IN ('none','lot','lot_expiry')", name="lot_tracking_mode_valid"
         ),
         CheckConstraint("tax_rate >= 0 AND tax_rate <= 100", name="tax_rate_range"),
+        CheckConstraint(
+            "created_via IN ('catalogue','quick_bill','import')", name="created_via_valid"
+        ),
+        Index("ix_products_track_stock", "track_stock", "is_active"),
     )
 
     sku: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
@@ -78,6 +83,12 @@ class Product(Base, UUIDPKMixin, AuditedMixin):
     tax_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default=text("0"))
     lot_tracking_mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default="none")
     is_active: Mapped[bool] = mapped_column(nullable=False, server_default=text("true"))
+    # Untracked products (Quick Bill) carry no stock balance; they are priced
+    # and sold without ever touching inventory.
+    track_stock: Mapped[bool] = mapped_column(nullable=False, server_default=text("true"))
+    default_sale_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    default_purchase_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    created_via: Mapped[str] = mapped_column(String(15), nullable=False, server_default="catalogue")
 
     category: Mapped[ProductCategory] = relationship(lazy="joined")
     brand: Mapped[Brand | None] = relationship(lazy="joined")
@@ -104,6 +115,12 @@ class ProductVariant(Base, UUIDPKMixin, AuditedMixin):
     # Validated against the category attribute_schema on every write.
     attributes: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
     is_active: Mapped[bool] = mapped_column(nullable=False, server_default=text("true"))
+    # Low-stock alerting threshold; NULL means "never warn".
+    reorder_level: Mapped[Decimal | None] = mapped_column(Numeric(14, 3))
+    # Cost fallback for untracked variants, which hold no balance row and so
+    # have no weighted average to read.
+    standard_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))
+    last_sale_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
 
     product: Mapped[Product] = relationship(back_populates="variants", lazy="joined")
     uom: Mapped[UnitOfMeasure] = relationship(lazy="joined")

@@ -12,6 +12,9 @@ from app.models.base import Base, TimestampMixin, UUIDPKMixin
 RESERVATION_STATUSES = ("active", "released", "fulfilled")
 MOVEMENT_TYPES = (
     "opening", "adjustment", "delivery_out", "delivery_reversal", "receipt_in",
+    # Direct-sale path: stock leaves when the invoice is finalized, and comes
+    # back if it is cancelled. Order-driven sales still use delivery_out.
+    "invoice_out", "invoice_return",
 )
 
 
@@ -47,6 +50,9 @@ class StockBalance(Base):
         Numeric(14, 3), nullable=False, server_default=text("0")
     )
     version: Mapped[int] = mapped_column(nullable=False, server_default=text("1"))
+    # Moving weighted average, recalculated on every costed receipt. NULL until
+    # the first receipt that carries a cost.
+    avg_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))
     updated_at: Mapped[datetime] = mapped_column(
         server_default=text("now()"), onupdate=text("now()"), nullable=False
     )
@@ -101,6 +107,9 @@ class StockMovement(Base, UUIDPKMixin):
     movement_type: Mapped[str] = mapped_column(String(25), nullable=False)
     reference_type: Mapped[str | None] = mapped_column(String(40))
     reference_id: Mapped[str | None] = mapped_column(String(80))
+    # Cost per unit for this movement: what it was bought at on the way in,
+    # what it was carried at on the way out.
+    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))
     notes: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     movement_at: Mapped[datetime] = mapped_column(server_default=text("now()"), nullable=False)

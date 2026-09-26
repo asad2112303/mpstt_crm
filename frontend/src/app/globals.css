@@ -23,6 +23,8 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-viz-sales: var(--viz-sales);
+  --color-viz-profit: var(--viz-profit);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -81,6 +83,12 @@
   --chart-1: #087f74;
   --chart-2: #7bcbb8;
   --chart-3: #075e59;
+  /* Chart series colors. Brand teal reads near-gray and the pale mint
+     fails contrast as a line, so the two trend series use validated steps:
+     both pass lightness, chroma, CVD separation and 3:1 contrast against
+     their own surface (checked per mode, not flipped). */
+  --viz-sales: #0d9488;
+  --viz-profit: #b45309;
   --chart-4: #f2b705;
   --chart-5: #263238;
   --radius: 0.625rem;
@@ -120,6 +128,8 @@
   --chart-1: #29a294;
   --chart-2: #7bcbb8;
   --chart-3: #4d8f87;
+  --viz-sales: #0d9488;
+  --viz-profit: #d97706;
   --chart-4: #f2b705;
   --chart-5: #a8bcb8;
   --sidebar: #0c1a18;

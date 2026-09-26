@@ -14,6 +14,7 @@ from app.core.errors import ConflictError, NotFoundError
 from app.core.security import CurrentUser, require_admin, require_user
 from app.models.catalogue import Product, ProductVariant
 from app.models.inventory import StockMovement, Warehouse
+from app.services.audit import write_audit
 from app.services.inventory import admin_adjust_stock
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -202,3 +203,196 @@ async def create_adjustment(
         "on_hand": str(balance.on_hand),
         "reserved": str(balance.reserved),
     })
+
+
+class ReceiptIn(BaseModel):
+    """Stock coming in, with the cost that drives the weighted average."""
+
+    warehouse_id: uuid.UUID | None = None
+    product_variant_id: uuid.UUID
+    quantity: Decimal = Field(gt=0)
+    # Optional: a receipt with no cost still adds quantity, it just leaves the
+    # average where it was and shows up as incomplete cost coverage.
+    unit_cost: Decimal | None = Field(default=None, ge=0)
+    reference: str | None = Field(default=None, max_length=80)
+    notes: str | None = None
+    movement_type: str = Field(default="receipt_in", pattern="^(receipt_in|opening)$")
+
+
+@router.post("/receipts", status_code=201)
+async def create_receipt(
+    payload: ReceiptIn,
+    user: CurrentUser = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Book stock in and roll the weighted average cost forward."""
+    from app.services.costing import receive_stock
+    from app.services.inventory import get_default_warehouse
+
+    warehouse = (
+        await db.get(Warehouse, payload.warehouse_id)
+        if payload.warehouse_id
+        else await get_default_warehouse(db)
+    )
+    if warehouse is None:
+        raise NotFoundError("Warehouse not found.")
+    variant = await db.get(ProductVariant, payload.product_variant_id)
+    if variant is None:
+        raise NotFoundError("Variant not found.")
+    product = await db.get(Product, variant.product_id)
+    if not product.track_stock:
+        raise ConflictError(
+            f"'{product.name}' is not stock-tracked. Enable tracking before receiving stock.",
+            code="PRODUCT_NOT_TRACKED",
+        )
+
+    balance = await receive_stock(
+        db,
+        warehouse_id=warehouse.id,
+        product_variant_id=variant.id,
+        quantity=payload.quantity,
+        unit_cost=payload.unit_cost,
+        user_id=user.id,
+        movement_type=payload.movement_type,
+        reference_type="manual",
+        reference_id=payload.reference,
+        notes=payload.notes,
+    )
+    await write_audit(
+        db, action="stock.received", entity_type="stock_balance",
+        entity_id=f"{warehouse.id}:{variant.id}",
+        new={"quantity": str(payload.quantity), "unit_cost": str(payload.unit_cost or "")},
+    )
+    await db.commit()
+    return ok({
+        "warehouse_id": str(balance.warehouse_id),
+        "product_variant_id": str(balance.product_variant_id),
+        "on_hand": str(balance.on_hand),
+        "avg_cost": str(balance.avg_cost) if balance.avg_cost is not None else None,
+    })
+
+
+class EnableTrackingIn(BaseModel):
+    """Promote a Quick Bill product to stock-tracked."""
+
+    warehouse_id: uuid.UUID | None = None
+    opening_quantity: Decimal = Field(ge=0)
+    unit_cost: Decimal | None = Field(default=None, ge=0)
+    reorder_level: Decimal | None = Field(default=None, ge=0)
+
+
+@router.post("/products/{product_id}/enable-tracking")
+async def enable_tracking(
+    product_id: uuid.UUID,
+    payload: EnableTrackingIn,
+    user: CurrentUser = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Start tracking stock for a product that was created while billing.
+
+    Opening stock is what the user says is on the shelf now. Quantities already
+    sold on Quick Bill invoices are deliberately not inferred as stock received.
+    """
+    from app.services.costing import receive_stock
+    from app.services.inventory import get_default_warehouse
+
+    product = await db.get(Product, product_id)
+    if product is None:
+        raise NotFoundError("Product not found.")
+    if product.track_stock:
+        raise ConflictError("This product is already stock-tracked.", code="ALREADY_TRACKED")
+
+    product.track_stock = True
+    if payload.unit_cost is not None:
+        product.default_purchase_cost = payload.unit_cost
+    product.updated_by = uuid.UUID(user.id)
+
+    variants = (
+        await db.execute(select(ProductVariant).where(ProductVariant.product_id == product.id))
+    ).scalars().all()
+    if payload.reorder_level is not None:
+        for variant in variants:
+            variant.reorder_level = payload.reorder_level
+
+    opened = []
+    if payload.opening_quantity > 0:
+        warehouse = (
+            await db.get(Warehouse, payload.warehouse_id)
+            if payload.warehouse_id
+            else await get_default_warehouse(db)
+        )
+        if len(variants) != 1:
+            raise ConflictError(
+                "This product has several variants. Enter opening stock per variant "
+                "under Inventory instead.",
+                code="MULTIPLE_VARIANTS",
+            )
+        await receive_stock(
+            db,
+            warehouse_id=warehouse.id,
+            product_variant_id=variants[0].id,
+            quantity=payload.opening_quantity,
+            unit_cost=payload.unit_cost,
+            user_id=user.id,
+            movement_type="opening",
+            reference_type="enable_tracking",
+            reference_id=str(product.id),
+            notes="Opening stock on enabling tracking",
+        )
+        opened.append(str(variants[0].id))
+
+    await write_audit(
+        db, action="product.tracking_enabled", entity_type="product", entity_id=product.id,
+        new={"opening_quantity": str(payload.opening_quantity),
+             "unit_cost": str(payload.unit_cost or "")},
+    )
+    await db.commit()
+    return ok({"product_id": str(product.id), "track_stock": True, "opened_variants": opened})
+
+
+@router.get("/low-stock")
+async def low_stock(
+    warehouse_id: uuid.UUID | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    user: CurrentUser = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Tracked variants at or below their reorder level."""
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT v.id AS variant_id, p.id AS product_id, p.name AS product_name,
+                       v.variant_name, v.reorder_level, u.code AS uom_code,
+                       COALESCE(b.on_hand, 0) AS on_hand,
+                       COALESCE(b.reserved, 0) AS reserved,
+                       b.avg_cost, w.code AS warehouse_code, w.id AS warehouse_id
+                FROM crm.product_variants v
+                JOIN crm.products p ON p.id = v.product_id
+                JOIN crm.units_of_measure u ON u.id = v.uom_id
+                LEFT JOIN crm.stock_balances b ON b.product_variant_id = v.id
+                     AND (CAST(:wh AS uuid) IS NULL OR b.warehouse_id = CAST(:wh AS uuid))
+                LEFT JOIN crm.warehouses w ON w.id = b.warehouse_id
+                WHERE p.track_stock AND p.is_active AND v.is_active
+                  AND v.reorder_level IS NOT NULL
+                  AND COALESCE(b.on_hand, 0) - COALESCE(b.reserved, 0) <= v.reorder_level
+                ORDER BY (COALESCE(b.on_hand, 0) - COALESCE(b.reserved, 0)) - v.reorder_level
+                LIMIT :limit
+                """
+            ),
+            {"wh": str(warehouse_id) if warehouse_id else None, "limit": limit},
+        )
+    ).mappings().all()
+    return ok([
+        {
+            "product_variant_id": str(r["variant_id"]),
+            "product_id": str(r["product_id"]),
+            "label": f"{r['product_name']} — {r['variant_name']}",
+            "uom_code": r["uom_code"],
+            "on_hand": str(r["on_hand"]),
+            "available": str(r["on_hand"] - r["reserved"]),
+            "reorder_level": str(r["reorder_level"]),
+            "warehouse_code": r["warehouse_code"],
+        }
+        for r in rows
+    ])

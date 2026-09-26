@@ -20,6 +20,21 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def include_object(obj, name, type_, reflected, compare_to) -> bool:
+    """Autogenerate owns the ``crm`` schema and nothing else.
+
+    ``public.quotation_requests`` belongs to the website and is created from
+    ``supabase/sql/quotation_requests.sql``. It is declared on Base.metadata so
+    the ORM can read it and so autogenerate never proposes dropping the table —
+    but its CHECK and UNIQUE constraints are not modelled there, and without
+    this filter autogenerate would propose dropping those instead.
+    """
+    if type_ == "table":
+        return obj.schema == "crm"
+    parent = getattr(obj, "table", None)
+    return parent is None or parent.schema == "crm"
+
+
 def _sync_url() -> str:
     url = os.environ.get("DATABASE_URL", "")
     if not url:
@@ -34,6 +49,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         include_schemas=True,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -47,7 +63,8 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-                include_schemas=True,
+            include_schemas=True,
+            include_object=include_object,
         )
         with context.begin_transaction():
             context.run_migrations()

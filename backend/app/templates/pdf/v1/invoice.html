@@ -83,6 +83,9 @@
         {% if order_number %}
         <tr><td class="label">Order Ref</td><td class="value">{{ order_number }}</td></tr>
         {% endif %}
+        {% if invoice.reference %}
+        <tr><td class="label">Your Ref</td><td class="value">{{ invoice.reference }}</td></tr>
+        {% endif %}
       </table>
     </div>
   </div>
@@ -96,6 +99,8 @@
       <h4>BILL TO</h4>
       <div class="party-body">
         <span class="strong">{{ customer.name }}</span><br>
+        {% if customer.contact_person %}Attn: {{ customer.contact_person }}<br>{% endif %}
+        {% if customer.billing_address %}<span style="white-space: pre-wrap;">{{ customer.billing_address }}</span><br>{% endif %}
         {% if customer.city %}{{ customer.city }}<br>{% endif %}
         {% if customer.phone %}{{ customer.phone }}<br>{% endif %}
         {% if customer.ntn %}NTN: {{ customer.ntn }}{% endif %}
@@ -104,7 +109,9 @@
     <div class="party-box">
       <h4>PAYMENT</h4>
       <div class="party-body">
-        Terms: {{ invoice.terms_days }} days<br>
+        Terms: {% if invoice.terms_days %}{{ invoice.terms_days }} days{% else %}Due on receipt{% endif %}<br>
+        {% if invoice.payment_terms_note %}{{ invoice.payment_terms_note }}<br>{% endif %}
+        {% if customer.delivery_address %}Deliver to: <span style="white-space: pre-wrap;">{{ customer.delivery_address }}</span><br>{% endif %}
         {% if company.bank_details %}<span style="white-space: pre-wrap;">{{ company.bank_details }}</span>{% endif %}
       </div>
     </div>
@@ -143,7 +150,7 @@
     </tbody>
   </table>
 
-  {% if invoice.discount_total | num > 0 or invoice.tax_total | num > 0 %}
+  {% if invoice.discount_total | num > 0 or invoice.tax_total | num > 0 or invoice.delivery_charge | num > 0 %}
   <table class="pretotals">
     <tr><td class="label" style="width:80%">Subtotal</td><td class="num">{{ invoice.subtotal | money }}</td></tr>
     {% if invoice.discount_total | num > 0 %}
@@ -152,13 +159,28 @@
     {% if invoice.tax_total | num > 0 %}
     <tr><td class="label">Tax</td><td class="num">{{ invoice.tax_total | money }}</td></tr>
     {% endif %}
+    {% if invoice.delivery_charge | num > 0 %}
+    <tr><td class="label">Delivery</td><td class="num">{{ invoice.delivery_charge | money }}</td></tr>
+    {% endif %}
   </table>
   {% endif %}
 
   <div class="total-band">
-    <span>AMOUNT DUE</span>
+    <span>INVOICE TOTAL</span>
     <span class="amount">{{ invoice.currency }} {{ invoice.grand_total | money }}</span>
   </div>
+
+  {% if payment and payment.amount_paid | num > 0 %}
+  <table class="pretotals">
+    <tr><td class="label" style="width:80%">Payment received</td><td class="num">-{{ payment.amount_paid | money }}</td></tr>
+    <tr>
+      <td class="label" style="font-weight:700; color:#075E59;">
+        {% if payment.fully_paid %}Balance — PAID IN FULL{% else %}Balance due{% endif %}
+      </td>
+      <td class="num" style="font-weight:700;">{{ invoice.currency }} {{ payment.balance_due | money }}</td>
+    </tr>
+  </table>
+  {% endif %}
 
   <div class="bottom-grid">
     <div class="notes-box">

@@ -55,6 +55,9 @@ class Organization(Base, UUIDPKMixin, AuditedMixin):
     ntn: Mapped[str | None] = mapped_column(String(50))
     notes: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(nullable=False, server_default=text("true"))
+    # Reserved rows the app depends on (Walk-in Customer). Hidden from the
+    # prospect and customer lists and never editable from the UI.
+    is_system: Mapped[bool] = mapped_column(nullable=False, server_default=text("false"))
     converted_at: Mapped[datetime | None] = mapped_column()
 
     prospect_profile: Mapped["ProspectProfile | None"] = relationship(

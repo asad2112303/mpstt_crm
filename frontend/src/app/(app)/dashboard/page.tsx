@@ -9,6 +9,7 @@ import {
 import { api, ApiError } from "@/lib/api";
 import { STAGE_LABELS, type ProspectStage } from "@/lib/types/crm";
 import { useAuth } from "@/lib/auth-context";
+import { BusinessOverview } from "@/components/billing/business-overview";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -121,21 +122,24 @@ export default function DashboardPage() {
     refetchInterval: 60_000,
   });
 
-  if (isLoading) {
+  // Business overview renders on its own data; the CRM queues below degrade
+  // independently so one slow query cannot blank the whole dashboard.
+  if (isLoading || error || !data) {
     return (
-      <main className="space-y-4 p-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </main>
-    );
-  }
-  if (error || !data) {
-    return (
-      <main className="p-6">
-        <p role="alert" className="text-sm text-destructive">
-          Dashboard failed to load: {error instanceof ApiError ? error.message : "unknown error"}
-        </p>
+      <main className="space-y-8 p-6">
+        <PageHeader
+          title={`Welcome${me ? `, ${me.full_name.split(" ")[0]}` : ""}`}
+          description="Today's work — Asia/Karachi"
+        />
+        <BusinessOverview />
+        {isLoading ? (
+          <Skeleton className="h-40 w-full" />
+        ) : (
+          <p role="alert" className="text-sm text-destructive">
+            CRM queues failed to load:{" "}
+            {error instanceof ApiError ? error.message : "unknown error"}
+          </p>
+        )}
       </main>
     );
   }
@@ -149,6 +153,8 @@ export default function DashboardPage() {
         title={`Welcome${me ? `, ${me.full_name.split(" ")[0]}` : ""}`}
         description={`Today's work — ${data.as_of} (Asia/Karachi)`}
       />
+
+      <BusinessOverview />
 
       <section aria-label="Action queues" className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">

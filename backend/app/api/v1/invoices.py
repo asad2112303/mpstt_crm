@@ -24,7 +24,9 @@ from app.models.invoices import Invoice, InvoiceItem
 from app.models.orders import SalesOrder
 from app.models.organization import CustomerProfile, Organization
 from app.services.audit import write_audit
+from app.services.billing import reverse_stock
 from app.services.idempotency import require_idempotency_key, run_idempotent
+from app.services.invoicing import build_pdf_context, payment_context
 from app.services.numbering import allocate_number
 from app.services.pdf import freeze_context, render_html, render_pdf
 
@@ -55,6 +57,8 @@ class InvoiceItemOut(BaseModel):
     line_tax: Decimal
     line_total: Decimal
     sort_order: int
+    line_source: str
+    cost_source: str | None
 
 
 class InvoiceOut(BaseModel):
@@ -77,6 +81,21 @@ class InvoiceOut(BaseModel):
     issued_at: datetime | None
     pdf_document_id: uuid.UUID | None
     created_at: datetime
+    is_direct: bool
+    is_walk_in: bool
+    walk_in_name: str | None
+    warehouse_id: uuid.UUID | None
+    stock_committed_at: datetime | None
+    reference_number: str | None
+    contact_person: str | None
+    contact_phone: str | None
+    billing_address: str | None
+    delivery_address: str | None
+    payment_terms_note: str | None
+    overall_discount_type: str | None
+    overall_discount_value: Decimal
+    overall_discount_amount: Decimal
+    delivery_charge: Decimal
     items: list[InvoiceItemOut] = []
 
 
@@ -115,6 +134,39 @@ async def allocated_amount(db: AsyncSession, invoice_id: uuid.UUID) -> Decimal:
     return Decimal(value)
 
 
+def line_profit(invoice: Invoice) -> dict:
+    """Gross profit for an issued invoice, and how complete the cost data is.
+
+    A line with no cost is never treated as zero cost — that would report the
+    whole sale price as profit. It is excluded from the figure and counted in
+    ``sales_missing_cost`` instead, so the gap is visible.
+    """
+    if invoice.status != "issued":
+        return {"cogs": None, "gross_profit": None, "cost_complete": None,
+                "sales_with_cost": "0", "sales_missing_cost": "0"}
+    cogs = Decimal("0")
+    with_cost = Decimal("0")
+    missing = Decimal("0")
+    for item in invoice.items:
+        if item.unit_cost is None:
+            missing += item.line_net
+            continue
+        cogs += item.unit_cost * item.quantity
+        with_cost += item.line_net
+    net_sales = with_cost + missing
+    return {
+        "cogs": str(round(cogs, 2)),
+        # Net of tax, as the spec requires: tax collected is not revenue.
+        "gross_profit": str(round(with_cost - cogs, 2)),
+        "cost_complete": missing == 0,
+        "sales_with_cost": str(with_cost),
+        "sales_missing_cost": str(missing),
+        "cost_coverage_percent": (
+            str(round(with_cost / net_sales * 100, 1)) if net_sales > 0 else None
+        ),
+    }
+
+
 async def invoice_out(db: AsyncSession, invoice: Invoice) -> dict:
     allocated = await allocated_amount(db, invoice.id)
     data = InvoiceOut.model_validate(invoice).model_dump(mode="json")
@@ -123,6 +175,7 @@ async def invoice_out(db: AsyncSession, invoice: Invoice) -> dict:
         invoice.grand_total - allocated if invoice.status == "issued" else Decimal("0")
     )
     data["derived_status"] = derived_status(invoice, allocated)
+    data["profit"] = line_profit(invoice)
     return data
 
 
@@ -295,46 +348,7 @@ async def issue_invoice(
 
         # Frozen document snapshot (see `freeze_context`): the PDF itself is
         # rendered on demand, so issuing does not depend on object storage.
-        from app.api.v1.quotations import _company_dict
-
-        company = await _company_dict(db)
-        org = await db.get(Organization, invoice.organization_id)
-        context = {
-            "company": company,
-            "invoice": {
-                "number": invoice.invoice_number,
-                "date": invoice.invoice_date.isoformat(),
-                "due_date": invoice.due_date.isoformat(),
-                "terms_days": invoice.payment_terms_days,
-                "subtotal": invoice.subtotal,
-                "discount_total": invoice.discount_total,
-                "tax_total": invoice.tax_total,
-                "grand_total": invoice.grand_total,
-                "currency": company.get("default_currency", "PKR"),
-                "notes": invoice.notes,
-            },
-            "customer": {
-                "name": org.name, "code": org.org_code, "city": org.city,
-                "phone": org.phone, "ntn": org.ntn,
-            },
-            "order_number": None,
-            "items": [
-                {
-                    "sn": i.sort_order + 1,
-                    "description": i.description_snapshot,
-                    "specification": i.specification_snapshot,
-                    "quantity": i.quantity,
-                    "uom": i.uom_code,
-                    "unit_price": i.unit_price,
-                    "line_total": i.line_total,
-                }
-                for i in invoice.items
-            ],
-        }
-        if invoice.sales_order_id:
-            order = await db.get(SalesOrder, invoice.sales_order_id)
-            context["order_number"] = order.order_number if order else None
-
+        context = await build_pdf_context(db, invoice)
         context = freeze_context(context)
         # Render the HTML now so a broken template fails here rather than at
         # download time, when the invoice is already issued.
@@ -380,11 +394,18 @@ async def cancel_invoice(
     invoice.status = "cancelled"
     invoice.cancelled_reason = reason
     invoice.updated_by = uuid.UUID(user.id)
+    # A direct invoice took stock out when it was finalized, so cancelling it
+    # must put that stock back. Order-driven invoices never moved stock here.
+    reversal = await reverse_stock(db, invoice, user_id=user.id, reason=f"Invoice cancelled: {reason}")
     await db.flush()
     await write_audit(db, action="invoice.cancelled", entity_type="invoice",
-                      entity_id=invoice.id, old={"status": old}, reason=reason)
+                      entity_id=invoice.id, old={"status": old},
+                      new={"stock_returned": reversal["stock_returned"]}, reason=reason)
     await db.commit()
-    return ok(await invoice_out(db, invoice))
+    await db.refresh(invoice, ["items"])
+    body = await invoice_out(db, invoice)
+    body["stock"] = reversal
+    return ok(body)
 
 
 @router.get("/{invoice_id}/pdf")
@@ -396,7 +417,14 @@ async def invoice_pdf(
 ):
     invoice = await _get_invoice(db, invoice_id)
     if invoice.pdf_context:
-        content = render_pdf("invoice.html", invoice.pdf_context)
+        # The document is frozen, but what has been paid keeps moving, so the
+        # payment block is resolved fresh on every download.
+        allocated = await allocated_amount(db, invoice.id)
+        context = {
+            **invoice.pdf_context,
+            "payment": payment_context(invoice.grand_total, allocated),
+        }
+        content = render_pdf("invoice.html", context)
         filename = f"{invoice.invoice_number}.pdf"
     elif invoice.pdf_document_id:
         # Invoices issued before snapshots: still served from storage.

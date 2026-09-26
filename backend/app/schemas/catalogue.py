@@ -68,6 +68,10 @@ class VariantUpdate(BaseModel):
     uom_id: uuid.UUID | None = None
     attributes: dict | None = None
     is_active: bool | None = None
+    # Low-stock threshold and the cost fallback for untracked variants.
+    reorder_level: Decimal | None = Field(default=None, ge=0)
+    standard_cost: Decimal | None = Field(default=None, ge=0)
+    last_sale_price: Decimal | None = Field(default=None, ge=0)
 
 
 class VariantOut(BaseModel):
@@ -79,6 +83,9 @@ class VariantOut(BaseModel):
     uom_id: uuid.UUID
     attributes: dict
     is_active: bool
+    reorder_level: Decimal | None
+    standard_cost: Decimal | None
+    last_sale_price: Decimal | None
 
 
 class ProductIn(BaseModel):
@@ -91,6 +98,9 @@ class ProductIn(BaseModel):
     tax_rate: Decimal = Field(default=Decimal("0"), ge=0, le=100)
     lot_tracking_mode: str = Field(default="none", pattern="^(none|lot|lot_expiry)$")
     is_active: bool = True
+    track_stock: bool = True
+    default_sale_price: Decimal | None = Field(default=None, ge=0)
+    default_purchase_cost: Decimal | None = Field(default=None, ge=0)
 
 
 class ProductUpdate(BaseModel):
@@ -100,6 +110,8 @@ class ProductUpdate(BaseModel):
     tax_rate: Decimal | None = Field(default=None, ge=0, le=100)
     lot_tracking_mode: str | None = Field(default=None, pattern="^(none|lot|lot_expiry)$")
     is_active: bool | None = None
+    default_sale_price: Decimal | None = Field(default=None, ge=0)
+    default_purchase_cost: Decimal | None = Field(default=None, ge=0)
 
 
 class ProductOut(BaseModel):
@@ -113,6 +125,10 @@ class ProductOut(BaseModel):
     description: str | None
     tax_rate: Decimal
     lot_tracking_mode: str
+    track_stock: bool
+    created_via: str
+    default_sale_price: Decimal | None
+    default_purchase_cost: Decimal | None
     is_active: bool
     variants: list[VariantOut] = []
 
