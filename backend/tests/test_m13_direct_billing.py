@@ -651,3 +651,121 @@ async def test_draft_can_be_edited_then_finalized(client, user_headers):
         json={"walk_in": True, "items": [await quick_line("Too Late", "1", "1")]},
     )
     assert locked.status_code == 409
+
+
+# --- stepped product picker -----------------------------------------------
+
+async def make_multi_variant_product(client, admin_headers) -> dict:
+    """One product, two colours x two sizes, plus an attribute they all share."""
+    suffix = uuid.uuid4().hex[:6]
+    cat = await client.post(
+        "/api/v1/catalogue/categories", headers=admin_headers,
+        json={
+            "name": f"Stepped Bags {suffix}",
+            "attribute_schema": {"attributes": [
+                {"key": "bag_type", "label": "Bag type", "type": "select", "required": True,
+                 "options": ["Clinical waste", "General waste"]},
+                {"key": "colour", "label": "Colour", "type": "select", "required": True,
+                 "options": ["Red", "Yellow"]},
+                {"key": "size", "label": "Size", "type": "select", "required": True,
+                 "options": ['24"x36"', '30"x40"']},
+            ]},
+        },
+    )
+    assert cat.status_code == 201, cat.text
+    uom = await client.post(
+        "/api/v1/catalogue/uoms", headers=admin_headers,
+        json={"code": f"RL{suffix[:4]}", "name": "Roll"},
+    )
+    product = await client.post(
+        "/api/v1/catalogue/products", headers=admin_headers,
+        json={"sku": f"SB-{suffix}", "name": f"Stepped Waste Bag {suffix}",
+              "category_id": cat.json()["data"]["id"],
+              "base_uom_id": uom.json()["data"]["id"], "tax_rate": "0"},
+    )
+    assert product.status_code == 201, product.text
+    pid = product.json()["data"]["id"]
+
+    for colour in ("Red", "Yellow"):
+        for size in ('24"x36"', '30"x40"'):
+            resp = await client.post(
+                f"/api/v1/catalogue/products/{pid}/variants", headers=admin_headers,
+                json={
+                    "variant_code": f"V{uuid.uuid4().hex[:8]}",
+                    "variant_name": f"{colour} {size}",
+                    # bag_type is the same on every variant on purpose.
+                    "attributes": {"bag_type": "Clinical waste", "colour": colour,
+                                   "size": size},
+                },
+            )
+            assert resp.status_code == 201, resp.text
+    return {"product_id": pid, "name": product.json()["data"]["name"]}
+
+
+async def test_picker_asks_only_for_attributes_that_vary(client, user_headers, admin_headers):
+    product = await make_multi_variant_product(client, admin_headers)
+
+    resp = await client.get(
+        "/api/v1/billing/catalogue", headers=user_headers,
+        params={"search": product["name"]},
+    )
+    assert resp.status_code == 200, resp.text
+    rows = resp.json()["data"]
+    assert len(rows) == 1
+    row = rows[0]
+
+    # Colour then size, in the category's own order. bag_type is identical on
+    # every variant, so it is not a question worth asking.
+    assert [s["key"] for s in row["steps"]] == ["colour", "size"]
+    assert [s["label"] for s in row["steps"]] == ["Colour", "Size"]
+    assert len(row["variants"]) == 4
+
+    # Narrowing by the steps reaches exactly one variant.
+    reds = [v for v in row["variants"] if v["attributes"]["colour"] == "Red"]
+    assert len(reds) == 2
+    exact = [v for v in reds if v["attributes"]["size"] == '24"x36"']
+    assert len(exact) == 1
+    assert exact[0]["uom_code"].startswith("RL")
+
+
+async def test_picker_skips_steps_for_a_single_variant_product(client, user_headers):
+    """A Quick Bill product has one variant, so there is nothing to narrow."""
+    name = f"Simple Item {uuid.uuid4().hex[:6]}"
+    draft = await client.post(
+        "/api/v1/billing/invoices", headers=user_headers,
+        json={"walk_in": True, "items": [await quick_line(name, "1", "100")]},
+    )
+    assert draft.status_code == 201, draft.text
+
+    resp = await client.get(
+        "/api/v1/billing/catalogue", headers=user_headers, params={"search": name}
+    )
+    row = resp.json()["data"][0]
+    assert row["steps"] == []
+    assert len(row["variants"]) == 1
+    assert row["track_stock"] is False
+
+
+async def test_picker_shows_stock_per_variant(client, user_headers, admin_headers, db_session):
+    product = await make_multi_variant_product(client, admin_headers)
+    wh = await ensure_warehouse(client, admin_headers)
+
+    resp = await client.get(
+        "/api/v1/billing/catalogue", headers=user_headers,
+        params={"search": product["name"]},
+    )
+    variants = resp.json()["data"][0]["variants"]
+    target = next(v for v in variants
+                  if v["attributes"]["colour"] == "Red" and v["attributes"]["size"] == '24"x36"')
+    await receive(client, user_headers, wh["id"], target["product_variant_id"], "40", "12")
+
+    again = await client.get(
+        "/api/v1/billing/catalogue", headers=user_headers,
+        params={"search": product["name"], "warehouse_id": wh["id"]},
+    )
+    rows = {v["product_variant_id"]: v for v in again.json()["data"][0]["variants"]}
+    assert rows[target["product_variant_id"]]["available"] == "40.000"
+    assert rows[target["product_variant_id"]]["has_cost"] is True
+    # The other three colours/sizes are separate stock, still empty.
+    others = [v for k, v in rows.items() if k != target["product_variant_id"]]
+    assert all(v["available"] == "0" for v in others)

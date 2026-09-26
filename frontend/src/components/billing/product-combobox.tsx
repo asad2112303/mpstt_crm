@@ -2,9 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Check, Package, PackageX, Plus } from "lucide-react";
+import { ArrowLeft, Check, Package, PackageX, Plus } from "lucide-react";
 import { api } from "@/lib/api";
-import type { BillingProduct, QuickProductPayload } from "@/lib/types/billing";
+import {
+  narrow,
+  type BillingProduct, type CatalogueProduct, type CatalogueVariant,
+  type QuickProductPayload,
+} from "@/lib/types/billing";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -127,6 +131,43 @@ function InlineNewProduct({
   );
 }
 
+/** Turn a resolved catalogue variant into the shape the bill line expects. */
+function toBillingProduct(
+  product: CatalogueProduct,
+  variant: CatalogueVariant,
+): BillingProduct {
+  const options = product.steps
+    .map((step) => variant.attributes[step.key])
+    .filter(Boolean)
+    .join(" · ");
+  return {
+    product_variant_id: variant.product_variant_id,
+    product_id: product.product_id,
+    sku: product.sku,
+    variant_code: "",
+    label: options ? `${product.name} — ${options}` : product.name,
+    product_name: product.name,
+    variant_name: variant.variant_name,
+    category: product.category,
+    attributes: variant.attributes,
+    uom_code: variant.uom_code,
+    tax_rate: product.tax_rate,
+    track_stock: variant.track_stock,
+    available: variant.available,
+    on_hand: variant.available,
+    suggested_price: variant.suggested_price,
+    has_cost: variant.has_cost,
+  };
+}
+
+/**
+ * Pick a product, then narrow it down one option at a time.
+ *
+ * Typing searches products rather than every variant, so "Waste Bag" is one
+ * row instead of twelve. Choosing it asks for the category's own attributes in
+ * order — colour, then size — and a step with only one possible answer is
+ * skipped rather than asked.
+ */
 export function ProductCombobox({
   value,
   typedName,
@@ -147,14 +188,16 @@ export function ProductCombobox({
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [product, setProduct] = useState<CatalogueProduct | null>(null);
+  const [chosen, setChosen] = useState<Record<string, string>>({});
   const boxRef = useRef<HTMLDivElement>(null);
 
   const query = typedName.trim();
   const { data, isFetching } = useQuery({
-    queryKey: ["billing-products", { query, onlyTracked, warehouseId }],
+    queryKey: ["billing-catalogue", { query, onlyTracked, warehouseId }],
     queryFn: async () =>
       (
-        await api<BillingProduct[]>("/api/v1/billing/products", {
+        await api<CatalogueProduct[]>("/api/v1/billing/catalogue", {
           searchParams: {
             search: query || undefined,
             only_tracked: onlyTracked || undefined,
@@ -162,37 +205,58 @@ export function ProductCombobox({
           },
         })
       ).data,
-    enabled: open && !adding,
+    enabled: open && !adding && !product,
   });
 
   useEffect(() => {
     function onClickAway(e: MouseEvent) {
       if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setAdding(false);
+        close();
       }
     }
     document.addEventListener("mousedown", onClickAway);
     return () => document.removeEventListener("mousedown", onClickAway);
   }, []);
 
+  function close() {
+    setOpen(false);
+    setAdding(false);
+    setProduct(null);
+    setChosen({});
+  }
+
+  /** Take a choice; if it lands on a single variant, that is the pick. */
+  function choose(p: CatalogueProduct, next: Record<string, string>) {
+    const result = narrow(p, next);
+    if (result.variant) {
+      onPick(toBillingProduct(p, result.variant));
+      close();
+      return;
+    }
+    setProduct(p);
+    setChosen(next);
+  }
+
   const results = data ?? [];
   const canCreate = query.length > 0 && !onlyTracked;
+  const state = product ? narrow(product, chosen) : null;
 
   return (
     <div className="relative" ref={boxRef}>
       <Input
         value={value?.label ?? typedName}
-        placeholder={onlyTracked ? "Search stock…" : "Type or search a product…"}
+        placeholder={onlyTracked ? "Search stock…" : "Type a product name…"}
         aria-label="Product"
         onFocus={() => setOpen(true)}
         onChange={(e) => {
           onTypedNameChange(e.target.value);
           setOpen(true);
+          setProduct(null);
+          setChosen({});
           setHighlight(0);
         }}
         onKeyDown={(e) => {
-          if (!open) return;
+          if (!open || product) return;
           if (e.key === "ArrowDown") {
             e.preventDefault();
             setHighlight((h) => Math.min(h + 1, results.length - 1));
@@ -201,14 +265,10 @@ export function ProductCombobox({
             setHighlight((h) => Math.max(h - 1, 0));
           } else if (e.key === "Enter") {
             e.preventDefault();
-            if (results[highlight]) {
-              onPick(results[highlight]);
-              setOpen(false);
-            } else if (canCreate) {
-              setAdding(true);
-            }
+            if (results[highlight]) choose(results[highlight], {});
+            else if (canCreate) setAdding(true);
           } else if (e.key === "Escape") {
-            setOpen(false);
+            close();
           }
         }}
       />
@@ -221,26 +281,141 @@ export function ProductCombobox({
               onCancel={() => setAdding(false)}
               onCreate={(payload) => {
                 onCreateNew(query, payload);
-                setAdding(false);
-                setOpen(false);
+                close();
               }}
             />
+          ) : product && state ? (
+            /* step 2+: narrow the chosen product down */
+            <div className="p-3">
+              <div className="flex items-center gap-2 border-b border-border pb-2">
+                <button
+                  type="button"
+                  aria-label="Back to product search"
+                  className="rounded-md p-1 hover:bg-muted"
+                  onClick={() => {
+                    setProduct(null);
+                    setChosen({});
+                  }}
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden />
+                </button>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{product.name}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {product.sku}
+                    {product.category ? ` · ${product.category}` : ""}
+                  </span>
+                </span>
+              </div>
+
+              {/* what has been chosen so far, each one undoable */}
+              {Object.keys(state.applied).length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-2">
+                  {product.steps
+                    .filter((s) => state.applied[s.key])
+                    .map((s) => (
+                      <button
+                        key={s.key}
+                        type="button"
+                        className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs hover:border-primary"
+                        onClick={() => {
+                          const next = { ...chosen };
+                          delete next[s.key];
+                          setChosen(next);
+                        }}
+                        title={`Change ${s.label.toLowerCase()}`}
+                      >
+                        {s.label}: <strong>{state.applied[s.key]}</strong> ×
+                      </button>
+                    ))}
+                </div>
+              )}
+
+              {state.step ? (
+                <div className="pt-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Choose {state.step.label.toLowerCase()}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {state.options.map((option) => {
+                      // Stock shown per option, so a colour that is empty is
+                      // obvious before it is chosen.
+                      const matching = state.candidates.filter(
+                        (v) => v.attributes[state.step!.key] === option,
+                      );
+                      const stock = matching.reduce(
+                        (sum, v) => sum + Number(v.available ?? 0),
+                        0,
+                      );
+                      const out = product.track_stock && stock <= 0;
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() =>
+                            choose(product, { ...chosen, [state.step!.key]: option })
+                          }
+                          className={cn(
+                            "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                            out
+                              ? "border-border bg-muted/40 text-muted-foreground"
+                              : "border-border bg-card hover:border-primary hover:bg-muted",
+                          )}
+                        >
+                          <span className="block font-medium">
+                            {option}
+                            {state.step!.unit ? ` ${state.step!.unit}` : ""}
+                          </span>
+                          {product.track_stock && (
+                            <span className="block text-xs text-muted-foreground">
+                              {out ? "Out of stock" : `${stock} available`}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                /* several variants share the same options — pick explicitly */
+                <ul className="max-h-60 overflow-auto pt-2">
+                  {state.candidates.map((v) => (
+                    <li key={v.product_variant_id}>
+                      <button
+                        type="button"
+                        className="w-full rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
+                        onClick={() => {
+                          onPick(toBillingProduct(product, v));
+                          close();
+                        }}
+                      >
+                        <span className="block font-medium">{v.variant_name}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {v.track_stock ? `${v.available} ${v.uom_code} available` : v.uom_code}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           ) : (
+            /* step 1: find the product */
             <ul className="max-h-72 overflow-auto py-1" role="listbox">
               {isFetching && results.length === 0 && (
                 <li className="px-3 py-2 text-sm text-muted-foreground">Searching…</li>
               )}
               {results.map((p, i) => {
-                const out = p.track_stock && Number(p.available ?? 0) <= 0;
+                const stock = p.variants.reduce(
+                  (sum, v) => sum + Number(v.available ?? 0),
+                  0,
+                );
                 return (
-                  <li key={p.product_variant_id} role="option" aria-selected={i === highlight}>
+                  <li key={p.product_id} role="option" aria-selected={i === highlight}>
                     <button
                       type="button"
                       onMouseEnter={() => setHighlight(i)}
-                      onClick={() => {
-                        onPick(p);
-                        setOpen(false);
-                      }}
+                      onClick={() => choose(p, {})}
                       className={cn(
                         "flex w-full items-start gap-2 px-3 py-2 text-left text-sm",
                         i === highlight && "bg-muted",
@@ -255,19 +430,19 @@ export function ProductCombobox({
                         />
                       )}
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{p.label}</span>
+                        <span className="block truncate font-medium">{p.name}</span>
                         <span className="block text-xs text-muted-foreground">
                           {p.sku}
                           {p.category ? ` · ${p.category}` : ""}
-                          {p.track_stock
-                            ? ` · ${p.available} ${p.uom_code} available`
-                            : " · not stock-tracked"}
-                          {!p.has_cost && " · no cost on file"}
+                          {p.steps.length > 0
+                            ? ` · choose ${p.steps.map((s) => s.label.toLowerCase()).join(", ")}`
+                            : ""}
+                          {p.track_stock ? ` · ${stock} in stock` : " · not stock-tracked"}
                         </span>
                       </span>
-                      {out && (
-                        <span className="shrink-0 rounded-full bg-destructive/15 px-2 py-0.5 text-xs text-destructive">
-                          Out of stock
+                      {p.steps.length > 0 && (
+                        <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
+                          {p.variants.length} options
                         </span>
                       )}
                     </button>

@@ -781,3 +781,111 @@ async def finalize_invoice(
     )
     await db.commit()
     return ok(body)
+
+
+# --------------------------------------------------------------------------
+# stepped picker: product first, then its options
+# --------------------------------------------------------------------------
+
+@router.get("/catalogue")
+async def billing_catalogue(
+    search: str | None = Query(None, max_length=200),
+    warehouse_id: uuid.UUID | None = Query(None),
+    only_tracked: bool = Query(False),
+    limit: int = Query(12, ge=1, le=40),
+    user: CurrentUser = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Products with their variants, for picking one step at a time.
+
+    The billing screen asks for the product first, then narrows by the
+    category's own attributes in the order the category defines them — colour,
+    then size, and so on. Returning the whole product in one response keeps
+    each step instant instead of a round trip per choice.
+    """
+    stmt = (
+        select(Product)
+        .options(selectinload(Product.variants).selectinload(ProductVariant.uom))
+        .where(Product.is_active.is_(True))
+    )
+    if only_tracked:
+        stmt = stmt.where(Product.track_stock.is_(True))
+    if search:
+        needle = f"%{search.strip()}%"
+        stmt = stmt.where(or_(Product.name.ilike(needle), Product.sku.ilike(needle)))
+    products = (
+        (await db.execute(stmt.order_by(Product.name).limit(limit))).scalars().unique().all()
+    )
+
+    all_variant_ids = [v.id for p in products for v in p.variants if v.is_active]
+    warehouse = None
+    if any(p.track_stock for p in products):
+        warehouse = (
+            await db.get(Warehouse, warehouse_id)
+            if warehouse_id
+            else await _optional_default_warehouse(db)
+        )
+    balances = (
+        await balances_for(db, warehouse.id, all_variant_ids) if warehouse else {}
+    )
+
+    rows = []
+    for product in products:
+        variants = [v for v in product.variants if v.is_active]
+        if not variants:
+            continue
+        schema = (product.category.attribute_schema or {}).get("attributes", [])
+        # Only ask about attributes the variants actually differ on; an
+        # attribute every variant shares is not a choice.
+        steps = []
+        for attr in schema:
+            key = attr.get("key")
+            values = {
+                str(v.attributes.get(key))
+                for v in variants
+                if v.attributes.get(key) not in (None, "")
+            }
+            if len(values) > 1:
+                steps.append({
+                    "key": key,
+                    "label": attr.get("label") or key.replace("_", " ").title(),
+                    "unit": attr.get("unit"),
+                })
+
+        rows.append({
+            "product_id": str(product.id),
+            "name": product.name,
+            "sku": product.sku,
+            "category": product.category.name if product.category else None,
+            "track_stock": product.track_stock,
+            "tax_rate": str(product.tax_rate),
+            "steps": steps,
+            "variants": [
+                {
+                    "product_variant_id": str(v.id),
+                    "variant_name": v.variant_name,
+                    "attributes": {k: str(val) for k, val in (v.attributes or {}).items()},
+                    "uom_code": v.uom.code if v.uom else None,
+                    "track_stock": product.track_stock,
+                    "available": (
+                        str(
+                            (balances[v.id].on_hand - balances[v.id].reserved)
+                            if v.id in balances
+                            else Decimal("0")
+                        )
+                        if product.track_stock
+                        else None
+                    ),
+                    "suggested_price": str(
+                        v.last_sale_price or product.default_sale_price or Decimal("0")
+                    ),
+                    "has_cost": bool(
+                        (v.id in balances and balances[v.id].avg_cost is not None)
+                        or v.standard_cost is not None
+                        or product.default_purchase_cost is not None
+                    ),
+                }
+                for v in variants
+            ],
+        })
+    return ok(rows)

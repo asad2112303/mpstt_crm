@@ -30,6 +30,79 @@ export interface BillingProduct {
   created_via?: "catalogue" | "quick_bill" | "import";
 }
 
+/** One option step the picker asks about, e.g. Colour then Size. */
+export interface CatalogueStep {
+  key: string;
+  label: string;
+  unit?: string | null;
+}
+
+export interface CatalogueVariant {
+  product_variant_id: string;
+  variant_name: string;
+  attributes: Record<string, string>;
+  uom_code: string | null;
+  track_stock: boolean;
+  available: string | null;
+  suggested_price: string;
+  has_cost: boolean;
+}
+
+/** A product plus everything needed to narrow it down to one variant. */
+export interface CatalogueProduct {
+  product_id: string;
+  name: string;
+  sku: string;
+  category: string | null;
+  track_stock: boolean;
+  tax_rate: string;
+  steps: CatalogueStep[];
+  variants: CatalogueVariant[];
+}
+
+/** Walk the steps, auto-applying any that have only one option left. */
+export function narrow(
+  product: CatalogueProduct,
+  chosen: Record<string, string>,
+): {
+  candidates: CatalogueVariant[];
+  applied: Record<string, string>;
+  step: CatalogueStep | null;
+  options: string[];
+  variant: CatalogueVariant | null;
+} {
+  const applied: Record<string, string> = {};
+  let candidates = product.variants;
+
+  for (const step of product.steps) {
+    const values = Array.from(
+      new Set(candidates.map((v) => v.attributes[step.key]).filter(Boolean)),
+    );
+    const picked = chosen[step.key];
+    if (picked && values.includes(picked)) {
+      applied[step.key] = picked;
+      candidates = candidates.filter((v) => v.attributes[step.key] === picked);
+      continue;
+    }
+    // Only one value survives earlier choices, so it is not a question.
+    if (values.length === 1) {
+      applied[step.key] = values[0];
+      candidates = candidates.filter((v) => v.attributes[step.key] === values[0]);
+      continue;
+    }
+    if (values.length > 1) {
+      return { candidates, applied, step, options: values, variant: null };
+    }
+  }
+  return {
+    candidates,
+    applied,
+    step: null,
+    options: [],
+    variant: candidates.length === 1 ? candidates[0] : null,
+  };
+}
+
 export interface BillingCustomer {
   id: string;
   name: string;
