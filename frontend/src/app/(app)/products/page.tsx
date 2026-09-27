@@ -184,7 +184,7 @@ export default function ProductsPage() {
   const lowStock = rows.filter((r) => r.low_stock);
 
   return (
-    <main className="space-y-5 p-6">
+    <main className="space-y-4 p-4 sm:space-y-5 sm:p-6">
       <PageHeader
         title="Products & Inventory"
         description="One catalogue, two views: what you hold stock of, and what you only bill."
@@ -197,7 +197,7 @@ export default function ProductsPage() {
       />
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex gap-1" role="group" aria-label="Product view">
+        <div className="no-min-target flex gap-1.5" role="group" aria-label="Product view">
           {(
             [
               ["tracked", "Stock-tracked", Package],
@@ -219,12 +219,12 @@ export default function ProductsPage() {
             </button>
           ))}
         </div>
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search
             className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden
           />
-          <Input className="w-72 pl-8" placeholder="Search products…" value={search}
+          <Input className="w-full pl-8 sm:w-72" placeholder="Search products…" value={search}
             aria-label="Search products" onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
@@ -251,7 +251,78 @@ export default function ProductsPage() {
             : "No Quick Bill products yet. They appear here as you create them while billing."}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+        <>
+          {/* Cards on phones: the tracked view is five columns wide and the
+              numbers matter more than the grid. */}
+          <ul className="space-y-2 lg:hidden">
+            {rows.map((r) => (
+              <li key={r.product_variant_id} className="rounded-lg border border-border bg-card p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium">{r.label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {r.sku}
+                      {r.category ? ` · ${r.category}` : ""}
+                      {r.created_via === "quick_bill" && " · added while billing"}
+                    </p>
+                  </div>
+                  {r.low_stock && <Badge variant="destructive">Low</Badge>}
+                </div>
+
+                <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+                  {tab === "tracked" ? (
+                    <>
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">Available</dt>
+                        <dd className="tabular-nums">{r.available} {r.uom_code}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">Avg cost</dt>
+                        <dd className="tabular-nums">
+                          {r.avg_cost ? pkrExact(r.avg_cost) : "—"}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">Reorder at</dt>
+                        <dd className="tabular-nums">{r.reorder_level ?? "—"}</dd>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">Unit</dt>
+                        <dd>{r.uom_code}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">Last price</dt>
+                        <dd className="tabular-nums">
+                          {Number(r.suggested_price) > 0 ? pkrExact(r.suggested_price) : "—"}
+                        </dd>
+                      </div>
+                      <div className="col-span-2 flex justify-between">
+                        <dt className="text-muted-foreground">Cost on file</dt>
+                        <dd className="tabular-nums">
+                          {r.standard_cost || r.default_purchase_cost
+                            ? pkrExact(r.standard_cost ?? r.default_purchase_cost)
+                            : <span className="text-xs text-warning-foreground">Profit incomplete</span>}
+                        </dd>
+                      </div>
+                    </>
+                  )}
+                </dl>
+
+                <Button
+                  variant="outline"
+                  className="mt-3 w-full"
+                  onClick={() => (tab === "tracked" ? setReceiving(r) : setEnabling(r))}
+                >
+                  {tab === "tracked" ? "Receive stock" : "Start tracking stock"}
+                </Button>
+              </li>
+            ))}
+          </ul>
+
+        <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -333,7 +404,8 @@ export default function ProductsPage() {
               ))}
             </TableBody>
           </Table>
-        </div>
+          </div>
+        </>
       )}
 
       <ReceiveStockDialog product={receiving} onClose={() => setReceiving(null)} />

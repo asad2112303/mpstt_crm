@@ -153,3 +153,68 @@
     @apply font-sans;
   }
 }
+/* ---------------------------------------------------------------------------
+   Mobile foundations
+   --------------------------------------------------------------------------- */
+
+:root {
+  /* Phone safe areas. Zero on desktop, real values on notched devices. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  /* Height of the mobile bottom navigation, so sticky bars and page padding
+     can reserve exactly the right amount of room instead of guessing. */
+  --bottom-nav-h: 4rem;
+  --bottom-nav-space: calc(var(--bottom-nav-h) + var(--safe-bottom));
+}
+
+@media (min-width: 1024px) {
+  :root {
+    /* The sidebar replaces bottom navigation from lg up. */
+    --bottom-nav-space: 0px;
+  }
+}
+
+/* Nothing may push the page sideways. Individual wide things (tables, charts)
+   opt into their own horizontal scroll container instead. */
+html,
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+/* Long unbroken strings — SKUs, emails, reference numbers — must wrap rather
+   than widen the page. */
+body {
+  overflow-wrap: break-word;
+}
+
+/* Touch targets. Pointer-coarse rather than a width breakpoint, so a phone in
+   landscape and a tablet both get finger-sized controls. */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  a[href],
+  select,
+  summary {
+    min-height: 44px;
+  }
+
+  /* Inline links in prose are not tap targets and must not gain height. */
+  p a[href],
+  li a[href],
+  label a[href],
+  .no-min-target,
+  .no-min-target button,
+  .no-min-target a[href] {
+    min-height: 0;
+  }
+
+  input,
+  select,
+  textarea {
+    /* 16px keeps iOS Safari from zooming the page on focus. */
+    font-size: max(16px, 1rem);
+  }
+}

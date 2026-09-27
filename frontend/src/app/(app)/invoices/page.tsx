@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Receipt } from "lucide-react";
+import { Plus, Receipt } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { Invoice, InvoiceDerivedStatus } from "@/lib/types/invoices";
 import { PageHeader } from "@/components/page-header";
@@ -54,22 +54,28 @@ export default function InvoicesPage() {
   const pages = Math.max(1, Math.ceil(total / 25));
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="space-y-4 p-4 sm:space-y-6 sm:p-6">
       <PageHeader
         title="Invoices"
         description="What is owed. Delivery and POD are recorded separately — an invoice never proves delivery."
+        actions={
+          <Button render={<Link href="/create-bill" />}>
+            <Plus className="mr-1.5 h-4 w-4" aria-hidden /> Create bill
+          </Button>
+        }
       />
 
       <div className="flex flex-wrap items-center gap-2">
-        <Input placeholder="Search invoice number or organization…" className="w-72" value={search}
+        <Input placeholder="Search invoice number or organization…"
+          className="w-full sm:w-72" value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           aria-label="Search invoices" />
-        <div className="flex gap-1" role="group" aria-label="Filter by status">
+        <div className="no-min-target flex flex-wrap gap-1.5" role="group" aria-label="Filter by status">
           {FILTERS.map((s) => (
             <button key={s || "all"}
               onClick={() => { setStatus(s); setPage(1); }}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium capitalize",
+                "rounded-full border px-3 py-1.5 text-xs font-medium capitalize",
                 status === s
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-card hover:bg-muted",
@@ -95,7 +101,44 @@ export default function InvoicesPage() {
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          {/* Phones get cards: a six-column table cannot be read at 320px
+              without sideways scrolling, and the important figures are the
+              amount and whether it is paid. */}
+          <ul className="space-y-2 lg:hidden">
+            {data.data.map((inv) => (
+              <li key={inv.id}>
+                <Link
+                  href={`/invoices/${inv.id}`}
+                  className="block rounded-lg border border-border bg-card p-3 active:bg-muted"
+                >
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="min-w-0">
+                      <span className="block font-medium text-primary">
+                        {inv.invoice_number ?? "(draft)"}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {inv.invoice_date ?? "No date"}
+                        {inv.due_date ? ` · due ${inv.due_date}` : ""}
+                      </span>
+                    </span>
+                    <InvoiceStatusBadge status={inv.derived_status} />
+                  </span>
+                  <span className="mt-2 flex items-end justify-between gap-2">
+                    <span className="text-lg font-semibold tabular-nums">
+                      {inv.grand_total}
+                    </span>
+                    {Number(inv.outstanding) > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        {inv.outstanding} outstanding
+                      </span>
+                    )}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -126,7 +169,7 @@ export default function InvoicesPage() {
               </TableBody>
             </Table>
           </div>
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
             <span>{total} invoices</span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" disabled={page <= 1}

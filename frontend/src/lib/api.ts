@@ -110,6 +110,30 @@ export async function api<T>(
   return json as ApiEnvelope<T>;
 }
 
+/**
+ * Fetch a binary response (the invoice PDF) with the same auth as `api`.
+ *
+ * The PDF endpoint returns application/pdf rather than the JSON envelope, so
+ * it cannot go through `api`, but it needs the same bearer token.
+ */
+export async function apiBlob(path: string): Promise<Blob> {
+  const token = await accessToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const resp = await fetch(`${API_BASE}${path}`, { headers });
+  if (!resp.ok) {
+    const json = await resp.json().catch(() => null);
+    throw new ApiError(resp.status, json?.error ?? {
+      code: "NETWORK_ERROR",
+      message: "The document could not be downloaded.",
+      field_errors: {},
+      request_id: "",
+    });
+  }
+  return await resp.blob();
+}
+
 export function newIdempotencyKey(): string {
   return crypto.randomUUID();
 }

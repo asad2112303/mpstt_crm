@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { pkr, pkrExact } from "@/lib/types/billing";
 
 /**
@@ -17,9 +17,10 @@ export interface TrendPoint {
   gross_profit: string;
 }
 
-const W = 720;
 const H = 240;
-const PAD = { top: 16, right: 76, bottom: 28, left: 8 };
+// Below this the end-of-line value labels are dropped and the figures move
+// into the legend, where they have room to be read.
+const NARROW = 420;
 
 const SERIES = [
   { key: "net_sales", label: "Net sales", color: "var(--viz-sales)" },
@@ -36,6 +37,28 @@ export function TrendChart({
   const [hover, setHover] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  // The viewBox tracks the real rendered width, so 11px text is 11px on a
+  // phone instead of being scaled down to something unreadable.
+  const [width, setWidth] = useState(720);
+
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const w = entry.contentRect.width;
+      if (w > 0) setWidth(Math.round(w));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [showTable]);
+
+  const narrow = width < NARROW;
+  const W = Math.max(280, width);
+  const PAD = useMemo(
+    () => ({ top: 16, right: narrow ? 10 : 76, bottom: 28, left: 8 }),
+    [narrow],
+  );
 
   const model = useMemo(() => {
     const values = points.flatMap((p) => [Number(p.net_sales), Number(p.gross_profit)]);
@@ -48,7 +71,7 @@ export function TrendChart({
       PAD.left + (points.length <= 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
     const y = (v: number) => PAD.top + innerH - ((v - min) / span) * innerH;
     return { max, min, x, y, innerH };
-  }, [points]);
+  }, [points, W, PAD]);
 
   if (points.length === 0) {
     return (
@@ -102,6 +125,11 @@ export function TrendChart({
                 style={{ background: s.color }}
               />
               {s.label}
+              {narrow && points.length > 0 && (
+                <strong className="text-foreground tabular-nums">
+                  {pkr(points[points.length - 1][s.key])}
+                </strong>
+              )}
             </span>
           ))}
         </span>
@@ -136,7 +164,7 @@ export function TrendChart({
           </table>
         </div>
       ) : (
-        <div className="relative">
+        <div className="relative" ref={wrapRef}>
           <svg
             ref={svgRef}
             viewBox={`0 0 ${W} ${H}`}
@@ -210,8 +238,9 @@ export function TrendChart({
                 />
               ))}
 
-            {/* direct labels at the final point: two series, so no number on every point */}
-            {SERIES.map((s) => (
+            {/* direct labels at the final point: two series, so no number on every
+                point. Dropped when narrow — the legend shows them instead. */}
+            {!narrow && SERIES.map((s) => (
               <text
                 key={s.key}
                 x={W - PAD.right + 8}

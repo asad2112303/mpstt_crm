@@ -11,12 +11,14 @@ import {
   Building2,
   ClipboardList,
   FileText,
+  Home,
   Inbox,
   Zap,
   Layers,
   LayoutDashboard,
   LogOut,
   Menu,
+  MoreHorizontal,
   Package,
   Receipt,
   ScrollText,
@@ -159,6 +161,68 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/** Phone navigation. Five destinations, with billing deliberately biggest. */
+const MOBILE_NAV: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/dashboard", label: "Home", icon: Home },
+  { href: "/invoices", label: "Bills", icon: Receipt },
+  { href: "/create-bill", label: "Create Bill", icon: Zap },
+  { href: "/products", label: "Products", icon: Package },
+];
+
+function MobileNav({ onMore }: { onMore: () => void }) {
+  const pathname = usePathname();
+
+  function isActive(href: string) {
+    return pathname === href || pathname.startsWith(href + "/");
+  }
+
+  return (
+    <nav
+      aria-label="Primary"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card lg:hidden"
+      // Sits above the home indicator rather than under it.
+      style={{ paddingBottom: "var(--safe-bottom)" }}
+    >
+      <ul className="mx-auto flex h-16 max-w-lg items-stretch justify-around px-1">
+        {MOBILE_NAV.map((item) => {
+          const active = isActive(item.href);
+          // Create Bill is the reason the app exists on a phone, so it is the
+          // one target that reads as a button rather than a tab.
+          const primary = item.href === "/create-bill";
+          return (
+            <li key={item.href} className="flex flex-1 items-center justify-center">
+              <Link
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex h-full w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[11px] font-medium",
+                  primary && "mx-1 -mt-4 h-[3.25rem] self-center rounded-xl bg-primary text-primary-foreground shadow-lg",
+                  !primary && active && "text-primary",
+                  !primary && !active && "text-muted-foreground",
+                )}
+              >
+                <item.icon className={cn("h-5 w-5 shrink-0", primary && "h-6 w-6")} aria-hidden />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+        <li className="flex flex-1 items-center justify-center">
+          <button
+            type="button"
+            onClick={onMore}
+            aria-label="More sections"
+            className="flex h-full w-full flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[11px] font-medium text-muted-foreground"
+          >
+            <MoreHorizontal className="h-5 w-5 shrink-0" aria-hidden />
+            <span>More</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+  );
+}
+
 function Brand() {
   return (
     <div className="flex items-center gap-2.5 px-6 py-5">
@@ -187,12 +251,15 @@ function UserMenu() {
       </Button>
     );
 
-  const initials = me.full_name
-    .split(/\s+/)
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  // A profile missing its name must not take the whole shell down with it.
+  const displayName = me.full_name?.trim() || me.email || "Account";
+  const initials =
+    displayName
+      .split(/\s+/)
+      .map((p) => p[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "?";
 
   return (
     <DropdownMenu>
@@ -203,14 +270,14 @@ function UserMenu() {
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
           {initials}
         </span>
-        <span className="hidden sm:inline">{me.full_name}</span>
+        <span className="hidden sm:inline">{displayName}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         {/* GroupLabel is only valid inside a Group — without it Base UI throws
             when the menu opens, which took the Sign out item down with it. */}
         <DropdownMenuGroup>
           <DropdownMenuLabel>
-            <p>{me.full_name}</p>
+            <p>{displayName}</p>
             <p className="text-xs font-normal text-muted-foreground">
               {me.email} · {me.role === "admin" ? "Admin" : "Operational user"}
             </p>
@@ -231,7 +298,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { error, signOut } = useAuth();
 
   return (
-    <div className="flex min-h-dvh w-full">
+    <div className="flex min-h-dvh w-full overflow-x-clip">
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
         <Brand />
@@ -241,27 +308,37 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-card/95 px-4 backdrop-blur">
+        <header
+          className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur sm:px-4"
+          style={{ paddingTop: "var(--safe-top)" }}
+        >
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-muted lg:hidden"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-muted lg:hidden"
               aria-label="Open navigation"
             >
               <Menu className="h-5 w-5" aria-hidden />
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 border-sidebar-border bg-sidebar p-0">
+            <SheetContent
+              side="left"
+              className="w-[min(18rem,85vw)] overflow-y-auto border-sidebar-border bg-sidebar p-0"
+            >
               <SheetTitle className="sr-only">Navigation</SheetTitle>
               <Brand />
               <NavLinks onNavigate={() => setMobileOpen(false)} />
             </SheetContent>
           </Sheet>
-          <div className="flex flex-1 justify-center">
+          <div className="flex min-w-0 flex-1 justify-center">
             <GlobalSearch />
           </div>
           <UserMenu />
         </header>
 
-        <div className="flex-1">
+        <div
+          className="min-w-0 flex-1"
+          // Content must end above the bottom navigation, not behind it.
+          style={{ paddingBottom: "var(--bottom-nav-space)" }}
+        >
           {error && (error.status === 401 || error.status === 403) ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
               <p className="text-lg font-medium">
@@ -280,6 +357,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
         </div>
       </div>
+
+      <MobileNav onMore={() => setMobileOpen(true)} />
     </div>
   );
 }

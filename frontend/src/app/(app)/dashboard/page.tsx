@@ -126,9 +126,9 @@ export default function DashboardPage() {
   // independently so one slow query cannot blank the whole dashboard.
   if (isLoading || error || !data) {
     return (
-      <main className="space-y-8 p-6">
+      <main className="space-y-6 p-4 sm:space-y-8 sm:p-6">
         <PageHeader
-          title={`Welcome${me ? `, ${me.full_name.split(" ")[0]}` : ""}`}
+          title={`Welcome${me?.full_name ? `, ${me.full_name.split(" ")[0]}` : ""}`}
           description="Today's work — Asia/Karachi"
         />
         <BusinessOverview />
@@ -148,9 +148,9 @@ export default function DashboardPage() {
   const mgmt = data.management;
 
   return (
-    <main className="space-y-8 p-6">
+    <main className="space-y-6 p-4 sm:space-y-8 sm:p-6">
       <PageHeader
-        title={`Welcome${me ? `, ${me.full_name.split(" ")[0]}` : ""}`}
+        title={`Welcome${me?.full_name ? `, ${me.full_name.split(" ")[0]}` : ""}`}
         description={`Today's work — ${data.as_of} (Asia/Karachi)`}
       />
 
@@ -160,7 +160,7 @@ export default function DashboardPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Needs attention
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-4">
           <ActionTile label="Follow-ups overdue" value={op.followups_overdue}
             href="/follow-ups" icon={BellRing} urgent />
           <ActionTile label="Follow-ups due today" value={op.followups_due_today}

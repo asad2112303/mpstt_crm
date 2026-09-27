@@ -39,12 +39,12 @@ function Tile({
   return (
     <Link
       href={href}
-      className="group rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/50"
+      className="group rounded-lg border border-border bg-card p-3 transition-colors hover:border-primary/50 sm:p-4"
     >
       <span className="block text-xs text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "mt-1 block text-xl font-semibold tabular-nums",
+          "mt-1 block text-lg font-semibold tabular-nums sm:text-xl",
           tone === "bad" && "text-destructive",
           tone === "good" && "text-primary",
         )}
@@ -138,19 +138,21 @@ export function BusinessOverview() {
   return (
     <section aria-label="Business overview" className="space-y-4">
       {/* actions first: the point is to start a bill in one click */}
-      <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {ACTIONS.map((a) => (
           <Link
             key={a.href}
             href={a.href}
             className={cn(
               "flex items-center gap-2 rounded-lg border p-3 text-sm font-medium transition-colors",
+              // Billing is the job; on a phone it gets the full width and the
+              // filled treatment so it cannot be missed.
               a.primary
-                ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-                : "border-border bg-card hover:border-primary/50",
+                ? "col-span-2 justify-center border-primary bg-primary py-4 text-base text-primary-foreground sm:col-span-1 sm:py-3 sm:text-sm lg:col-span-1"
+                : "border-border bg-card",
             )}
           >
-            <a.icon className="h-4 w-4 shrink-0" aria-hidden />
+            <a.icon className={cn("h-4 w-4 shrink-0", a.primary && "h-5 w-5 sm:h-4 sm:w-4")} aria-hidden />
             {a.label}
           </Link>
         ))}
@@ -158,13 +160,13 @@ export function BusinessOverview() {
 
       {/* one filter row above the figures */}
       <div className="flex flex-wrap items-end gap-2">
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Date range">
+        <div className="no-min-target flex flex-wrap gap-1.5" role="group" aria-label="Date range">
           {DATE_PRESETS.map((p) => (
             <button
               key={p.value}
               onClick={() => setPreset(p.value)}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium",
+                "rounded-full border px-3 py-1.5 text-xs font-medium",
                 preset === p.value
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-card hover:bg-muted",
@@ -199,7 +201,7 @@ export function BusinessOverview() {
         <Skeleton className="h-32 w-full" />
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
             <Tile label="Net sales (ex tax)" value={pkr(d.sales.net_sales)}
               href={`/invoices?range=${range}`}
               hint={`${d.sales.invoice_count} invoices · avg ${pkr(d.sales.average_invoice_value)}`} />
