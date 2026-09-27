@@ -129,8 +129,6 @@ function CreateBill() {
   const [delivery, setDelivery] = useState("");
 
   const [lines, setLines] = useState<DraftLine[]>([blankLine()]);
-  const [amountPaid, setAmountPaid] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
 
   const [draftId, setDraftId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -168,14 +166,22 @@ function CreateBill() {
     };
   }, [readyLines, discountType, discountValue, delivery]);
 
-  const shortages = readyLines.filter(
-    (l) => l.product?.track_stock && Number(l.product.available ?? 0) < Number(l.quantity || 0),
-  );
+  // Only "From Stock" is constrained by what is on the shelf. Quick Bill
+  // bills whatever is typed and leaves inventory alone.
+  const shortages =
+    mode === "stock"
+      ? readyLines.filter(
+          (l) =>
+            l.product?.track_stock &&
+            Number(l.product.available ?? 0) < Number(l.quantity || 0),
+        )
+      : [];
   const missingCost = readyLines.filter(
     (l) => !l.unit_cost && !(l.product?.has_cost ?? false) && !l.newProduct?.purchase_cost,
   );
 
   const buildPayload = useCallback(() => ({
+    billing_mode: mode,
     walk_in: walkIn,
     walk_in_name: walkIn ? walkInName || null : null,
     organization_id: walkIn ? null : customer?.id ?? null,
@@ -201,7 +207,7 @@ function CreateBill() {
       description: l.description || null,
       unit_cost: l.unit_cost || null,
     })),
-  }), [walkIn, walkInName, customer, invoiceDate, dueDate, reference, contactPerson,
+  }), [mode, walkIn, walkInName, customer, invoiceDate, dueDate, reference, contactPerson,
        contactPhone, billingAddress, deliveryAddress, notes, termsNote, discountType,
        discountValue, delivery, readyLines]);
 
@@ -291,7 +297,13 @@ function CreateBill() {
           // One key for the life of this form, so a double tap or a retry
           // after a dropped connection cannot bill twice.
           idempotencyKey: idemKey,
-          body: { amount_paid: amountPaid || null, payment_method: paymentMethod },
+          body: {
+            // A counter sale is paid by definition, so it settles itself and
+            // never sits in receivables. A named customer is invoiced and
+            // pays through the Payments module.
+            amount_paid: walkIn ? totals.grand.toFixed(2) : null,
+            payment_method: "cash",
+          },
         })
       ).data;
     },
@@ -409,8 +421,8 @@ function CreateBill() {
         <div className="grid gap-2 sm:grid-cols-2">
           {(
             [
-              ["quick", "Quick Bill", Zap, "Type anything. Products are saved as you go."],
-              ["stock", "From Stock", Package, "Choose from what you hold."],
+              ["quick", "Quick Bill", Zap, "Type anything. Stock is never touched."],
+              ["stock", "From Stock", Package, "Deducts stock when you finalize."],
             ] as [BillingMode, string, typeof Zap, string][]
           ).map(([value, label, Icon, hint]) => (
             <button
@@ -544,12 +556,16 @@ function CreateBill() {
           {lines.map((line, index) => {
             const a = lineAmounts(line);
             const chosen = line.product ?? null;
-            const source = chosen
-              ? chosen.track_stock ? "stock" : "quick_bill"
-              : line.newProduct
-                ? line.newProduct.track_stock ? "stock" : "quick_bill"
-                : null;
+            const known = chosen || line.newProduct;
+            const source = !known
+              ? null
+              : mode === "quick"
+                ? "quick_bill"
+                : chosen?.track_stock || line.newProduct?.track_stock
+                  ? "stock"
+                  : "quick_bill";
             const short =
+              mode === "stock" &&
               chosen?.track_stock &&
               Number(chosen.available ?? 0) < Number(line.quantity || 0);
 
@@ -741,38 +757,11 @@ function CreateBill() {
             <Row label="Invoice total" value={pkr(totals.grand)} strong />
           </div>
 
-          <div className="space-y-1.5 pt-3">
-            <Label htmlFor="paid">Amount received</Label>
-            <div className="flex gap-2">
-              <Input id="paid" inputMode="decimal" value={amountPaid} placeholder="0.00"
-                onChange={(e) => setAmountPaid(e.target.value)} />
-              <Button variant="outline" onClick={() => setAmountPaid(totals.grand.toFixed(2))}>
-                Full
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="method">Payment method</Label>
-            <select
-              id="method"
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-              className="h-11 w-full rounded-lg border border-input bg-transparent px-2 text-base md:h-8 md:text-sm"
-            >
-              <option value="cash">Cash</option>
-              <option value="bank_transfer">Bank transfer</option>
-              <option value="cheque">Cheque</option>
-              <option value="online">Online</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div className="border-t border-border pt-2">
-            <Row
-              label="Balance due"
-              value={pkrExact(Math.max(totals.grand - Number(amountPaid || 0), 0))}
-              strong
-            />
-          </div>
+          <p className="border-t border-border pt-3 text-xs text-muted-foreground">
+            {walkIn
+              ? "A walk-in sale is recorded as paid in full in cash."
+              : "This invoice is raised unpaid. Record the payment under Payments when it arrives."}
+          </p>
         </div>
 
         {(shortages.length > 0 || missingCost.length > 0) && (

@@ -769,3 +769,101 @@ async def test_picker_shows_stock_per_variant(client, user_headers, admin_header
     # The other three colours/sizes are separate stock, still empty.
     others = [v for k, v in rows.items() if k != target["product_variant_id"]]
     assert all(v["available"] == "0" for v in others)
+
+
+# --- Quick Bill never moves stock ----------------------------------------
+
+async def test_quick_bill_mode_never_deducts_stock(client, user_headers, admin_headers, db_session):
+    """Selling a tracked product on a Quick Bill leaves on-hand alone.
+
+    Quick Bill is for billing without depending on inventory, so the mode
+    decides, not the product. The sale is still costed from the weighted
+    average — not moving stock is no reason to report the profit as unknown.
+    """
+    variant = await make_tracked_variant(client, admin_headers, db_session)
+    wh = await ensure_warehouse(client, admin_headers)
+    await receive(client, user_headers, wh["id"], variant["id"], "10", "60")
+    assert await available(client, user_headers, variant["id"]) == Decimal("10")
+
+    draft = await client.post(
+        "/api/v1/billing/invoices", headers=user_headers,
+        json={"walk_in": True, "warehouse_id": wh["id"], "billing_mode": "quick",
+              "items": [{"product_variant_id": variant["id"], "quantity": "3",
+                         "unit_price": "100"}]},
+    )
+    assert draft.status_code == 201, draft.text
+    assert draft.json()["data"]["items"][0]["line_source"] == "quick_bill"
+
+    resp = await client.post(
+        f"/api/v1/billing/invoices/{draft.json()['data']['id']}/finalize",
+        headers=idem(user_headers), json={"amount_paid": "300"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()["data"]
+    assert body["stock"]["stock_moved"] is False
+    assert await available(client, user_headers, variant["id"]) == Decimal("10")
+
+    # Costed from the weighted average all the same: 3 * (100 - 60).
+    assert body["items"][0]["cost_source"] == "weighted_average"
+    assert body["profit"]["gross_profit"] == "120.00"
+    assert body["profit"]["cost_complete"] is True
+
+
+async def test_quick_bill_mode_is_not_blocked_by_short_stock(
+    client, user_headers, admin_headers, db_session
+):
+    """No stock, no problem: Quick Bill does not check availability."""
+    variant = await make_tracked_variant(client, admin_headers, db_session, colour="White")
+    wh = await ensure_warehouse(client, admin_headers)
+    await receive(client, user_headers, wh["id"], variant["id"], "2", "40")
+
+    draft = await client.post(
+        "/api/v1/billing/invoices", headers=user_headers,
+        json={"walk_in": True, "warehouse_id": wh["id"], "billing_mode": "quick",
+              "items": [{"product_variant_id": variant["id"], "quantity": "50",
+                         "unit_price": "100"}]},
+    )
+    resp = await client.post(
+        f"/api/v1/billing/invoices/{draft.json()['data']['id']}/finalize",
+        headers=idem(user_headers), json={"amount_paid": "5000"},
+    )
+    assert resp.status_code == 200, resp.text
+    # Stock mode would have refused this; Quick Bill bills it and leaves
+    # inventory untouched.
+    assert await available(client, user_headers, variant["id"]) == Decimal("2")
+
+
+async def test_stock_mode_still_deducts_and_still_guards(
+    client, user_headers, admin_headers, db_session
+):
+    """The default mode is unchanged: it moves stock and refuses to oversell."""
+    variant = await make_tracked_variant(client, admin_headers, db_session, colour="Blue")
+    wh = await ensure_warehouse(client, admin_headers)
+    await receive(client, user_headers, wh["id"], variant["id"], "5", "40")
+
+    draft = await client.post(
+        "/api/v1/billing/invoices", headers=user_headers,
+        json={"walk_in": True, "warehouse_id": wh["id"], "billing_mode": "stock",
+              "items": [{"product_variant_id": variant["id"], "quantity": "2",
+                         "unit_price": "100"}]},
+    )
+    assert draft.json()["data"]["items"][0]["line_source"] == "stock"
+    resp = await client.post(
+        f"/api/v1/billing/invoices/{draft.json()['data']['id']}/finalize",
+        headers=idem(user_headers), json={"amount_paid": "200"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert await available(client, user_headers, variant["id"]) == Decimal("3")
+
+    over = await client.post(
+        "/api/v1/billing/invoices", headers=user_headers,
+        json={"walk_in": True, "warehouse_id": wh["id"], "billing_mode": "stock",
+              "items": [{"product_variant_id": variant["id"], "quantity": "99",
+                         "unit_price": "100"}]},
+    )
+    blocked = await client.post(
+        f"/api/v1/billing/invoices/{over.json()['data']['id']}/finalize",
+        headers=idem(user_headers), json={"amount_paid": "9900"},
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["error"]["code"] == "INSUFFICIENT_STOCK"

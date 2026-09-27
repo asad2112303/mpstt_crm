@@ -27,7 +27,7 @@ from app.core.errors import ConflictError, ValidationFailedError
 from app.models.catalogue import Product, ProductVariant
 from app.models.inventory import StockMovement
 from app.models.invoices import Invoice, InvoiceItem
-from app.services.costing import cost, resolve_unit_cost
+from app.services.costing import balances_for, cost, resolve_unit_cost
 from app.services.inventory import lock_balances
 from app.services.money import LineAmounts, money
 
@@ -154,7 +154,8 @@ async def commit_stock_and_cost(
         raise ValidationFailedError("The invoice has no items.")
     products, variants = await _load_catalogue(session, items)
 
-    # Which lines actually move inventory.
+    # Which lines actually move inventory. A Quick Bill line never does, even
+    # when the product is stock-tracked.
     stock_items = [
         i
         for i in items
@@ -171,21 +172,37 @@ async def commit_stock_and_cost(
         balances = await lock_balances(
             session, invoice.warehouse_id, [i.product_variant_id for i in stock_items]
         )
-        # Validate the whole invoice before moving anything: all or nothing.
-        shortfalls = []
-        for item in stock_items:
-            balance = balances[item.product_variant_id]
-            available = balance.on_hand - balance.reserved
-            if available < item.quantity:
-                shortfalls.append(
-                    f"{item.description_snapshot} — need {item.quantity}, "
-                    f"{available} available"
-                )
-        if shortfalls:
-            raise ConflictError(
-                "Not enough stock to finalize this invoice: " + "; ".join(shortfalls),
-                code="INSUFFICIENT_STOCK",
+    # Costing reads the weighted average of every tracked line, including the
+    # Quick Bill ones we are not deducting: not moving stock is no reason to
+    # report the sale as having no cost.
+    uncosted_tracked = [
+        i.product_variant_id
+        for i in items
+        if products[i.product_id].track_stock and i.product_variant_id not in balances
+    ]
+    if uncosted_tracked and invoice.warehouse_id is not None:
+        balances = {
+            **await balances_for(session, invoice.warehouse_id, uncosted_tracked),
+            **balances,
+        }
+
+    # Validate the whole invoice before moving anything: all or nothing. This
+    # guards the deducting lines only — Quick Bill lines are not checked
+    # because they never leave the shelf.
+    shortfalls = []
+    for item in stock_items:
+        balance = balances[item.product_variant_id]
+        available = balance.on_hand - balance.reserved
+        if available < item.quantity:
+            shortfalls.append(
+                f"{item.description_snapshot} — need {item.quantity}, "
+                f"{available} available"
             )
+    if shortfalls:
+        raise ConflictError(
+            "Not enough stock to finalize this invoice: " + "; ".join(shortfalls),
+            code="INSUFFICIENT_STOCK",
+        )
 
     for item in items:
         product = products[item.product_id]

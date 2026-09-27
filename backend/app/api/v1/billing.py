@@ -13,6 +13,7 @@ twice.
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field, model_validator
@@ -99,6 +100,10 @@ LineIn.model_rebuild()
 
 
 class InvoiceDraftIn(BaseModel):
+    # Quick Bill never moves inventory, whatever the product is. Selling a
+    # tracked item this way records the sale and its cost but leaves on-hand
+    # alone — use "stock" mode when the goods actually left the shelf.
+    billing_mode: Literal["quick", "stock"] = "stock"
     organization_id: uuid.UUID | None = None
     walk_in: bool = False
     walk_in_name: str | None = Field(default=None, max_length=200)
@@ -436,7 +441,8 @@ async def quick_product(
 # --------------------------------------------------------------------------
 
 async def _build_items(
-    db: AsyncSession, invoice: Invoice, lines: list[LineIn], *, user_id: str
+    db: AsyncSession, invoice: Invoice, lines: list[LineIn], *,
+    user_id: str, billing_mode: str = "stock",
 ) -> list:
     """Turn payload lines into invoice items, creating products as needed."""
     amounts = []
@@ -482,8 +488,13 @@ async def _build_items(
             line_tax=calc.tax,
             line_total=calc.total,
             sort_order=index,
-            # A tracked product sold here moves stock; a Quick Bill one never does.
-            line_source="stock" if product.track_stock else "quick_bill",
+            # Quick Bill lines never move stock, tracked product or not.
+            # Otherwise a tracked product moves stock and an untracked one cannot.
+            line_source=(
+                "stock"
+                if billing_mode == "stock" and product.track_stock
+                else "quick_bill"
+            ),
         )
         if line.unit_cost is not None:
             # An explicit cost typed on the line wins over any catalogue cost,
@@ -576,7 +587,9 @@ async def create_direct_invoice(
     db.add(invoice)
     await db.flush()
 
-    amounts = await _build_items(db, invoice, payload.items, user_id=user.id)
+    amounts = await _build_items(
+        db, invoice, payload.items, user_id=user.id, billing_mode=payload.billing_mode
+    )
     apply_totals(
         invoice,
         calculate_totals(
@@ -632,7 +645,9 @@ async def update_direct_invoice(
     await db.flush()
 
     await _apply_header(db, invoice, payload, user_id=user.id)
-    amounts = await _build_items(db, invoice, payload.items, user_id=user.id)
+    amounts = await _build_items(
+        db, invoice, payload.items, user_id=user.id, billing_mode=payload.billing_mode
+    )
     apply_totals(
         invoice,
         calculate_totals(
