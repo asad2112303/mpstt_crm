@@ -79,7 +79,7 @@ function RankList({
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-[var(--viz-sales)]"
+                  className="h-full rounded-full bg-primary"
                   style={{ width: `${(Number(r.value) / max) * 100}%` }}
                 />
               </div>

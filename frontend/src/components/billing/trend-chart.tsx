@@ -2,14 +2,16 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { pkr, pkrExact } from "@/lib/types/billing";
+import { cn } from "@/lib/utils";
 
 /**
  * Net sales and gross profit over time.
  *
  * Both series are money in the same currency, so they share one axis — a
  * second y-scale would let any shape be drawn and is never used here.
- * Colors come from --viz-sales / --viz-profit, which are validated per theme
- * for lightness, chroma, colour-blind separation and contrast.
+ * Both series wear the brand teal. Two steps of one hue are too close to
+ * tell apart by colour (ΔE 10 against a floor of 15), so gross profit is
+ * dashed and the legend shows the dash — identity never rests on colour.
  */
 export interface TrendPoint {
   bucket: string;
@@ -23,8 +25,8 @@ const H = 240;
 const NARROW = 420;
 
 const SERIES = [
-  { key: "net_sales", label: "Net sales", color: "var(--viz-sales)" },
-  { key: "gross_profit", label: "Gross profit", color: "var(--viz-profit)" },
+  { key: "net_sales", label: "Net sales", color: "var(--chart-1)", dash: undefined },
+  { key: "gross_profit", label: "Gross profit", color: "var(--chart-3)", dash: "6 4" },
 ] as const;
 
 export function TrendChart({
@@ -119,11 +121,18 @@ export function TrendChart({
         <span className="flex flex-wrap gap-4 text-xs">
           {SERIES.map((s) => (
             <span key={s.key} className="flex items-center gap-1.5 text-muted-foreground">
-              <span
-                aria-hidden
-                className="inline-block h-2 w-3 rounded-sm"
-                style={{ background: s.color }}
-              />
+              {s.dash ? (
+                <svg aria-hidden width="18" height="8" className="inline-block">
+                  <line x1="0" y1="4" x2="18" y2="4" stroke={s.color}
+                    strokeWidth="2" strokeDasharray="4 3" />
+                </svg>
+              ) : (
+                <span
+                  aria-hidden
+                  className="inline-block h-2 w-4 rounded-sm"
+                  style={{ background: s.color }}
+                />
+              )}
               {s.label}
               {narrow && points.length > 0 && (
                 <strong className="text-foreground tabular-nums">
@@ -204,6 +213,7 @@ export function TrendChart({
                 fill="none"
                 stroke={s.color}
                 strokeWidth={2}
+                strokeDasharray={s.dash}
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
@@ -276,7 +286,7 @@ export function TrendChart({
                 <p key={s.key} className="flex items-center gap-1.5">
                   <span
                     aria-hidden
-                    className="inline-block h-2 w-2 rounded-full"
+                    className={cn("inline-block h-2 w-2", s.dash ? "rounded-none" : "rounded-full")}
                     style={{ background: s.color }}
                   />
                   <span className="text-muted-foreground">{s.label}</span>
