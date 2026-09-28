@@ -7,7 +7,7 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronDown,
-  Copy, Minus, Package, PackageX, Plus, Save, Trash2, Zap,
+  Copy, Minus, Package, PackageX, Plus, Save, Trash2,
 } from "lucide-react";
 import { api, ApiError, newIdempotencyKey } from "@/lib/api";
 import {
@@ -360,7 +360,7 @@ function CreateBill() {
             View invoice
           </Button>
           <Button render={<Link href="/create-bill" />} onClick={() => window.location.reload()}>
-            <Zap className="mr-1.5 h-4 w-4" aria-hidden /> New bill
+            New bill
           </Button>
         </div>
       </main>
@@ -421,10 +421,10 @@ function CreateBill() {
         <div className="grid gap-2 sm:grid-cols-2">
           {(
             [
-              ["quick", "Quick Bill", Zap, "Type anything. Stock is never touched."],
-              ["stock", "From Stock", Package, "Deducts stock when you finalize."],
-            ] as [BillingMode, string, typeof Zap, string][]
-          ).map(([value, label, Icon, hint]) => (
+              ["quick", "Quick Bill", "Type anything. Stock is never touched."],
+              ["stock", "From Stock", "Deducts stock when you finalize."],
+            ] as [BillingMode, string, string][]
+          ).map(([value, label, hint]) => (
             <button
               key={value}
               onClick={() => setMode(value)}
@@ -437,7 +437,6 @@ function CreateBill() {
               )}
             >
               <span className="flex items-center gap-2 text-sm font-semibold">
-                <Icon className="h-4 w-4" aria-hidden />
                 {label}
                 {mode === value && <Check className="ml-auto h-4 w-4" aria-hidden />}
               </span>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertTriangle, Banknote, FileText, PackagePlus, Receipt, TrendingUp, Zap,
+  AlertTriangle, Banknote, FilePlus, FileText, PackagePlus, Receipt, TrendingUp,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import {
@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 const ACTIONS = [
-  { href: "/create-bill?mode=quick", label: "Create Quick Bill", icon: Zap, primary: true },
+  { href: "/create-bill?mode=quick", label: "Create Quick Bill", icon: FilePlus, primary: true },
   { href: "/create-bill?mode=stock", label: "Invoice from Stock", icon: FileText },
   { href: "/inventory?tab=receive", label: "Add Stock", icon: PackagePlus },
   { href: "/payments", label: "Record Payment", icon: Banknote },

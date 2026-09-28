@@ -10,10 +10,10 @@ import {
   Boxes,
   Building2,
   ClipboardList,
+  FilePlus,
   FileText,
   Home,
   Inbox,
-  Zap,
   Layers,
   LayoutDashboard,
   LogOut,
@@ -63,7 +63,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/create-bill", label: "Create Bill", icon: Zap },
+      { href: "/create-bill", label: "Create Bill", icon: FilePlus },
     ],
   },
   {
@@ -165,7 +165,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 const MOBILE_NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/invoices", label: "Bills", icon: Receipt },
-  { href: "/create-bill", label: "Create Bill", icon: Zap },
+  { href: "/create-bill", label: "Create Bill", icon: FilePlus },
   { href: "/products", label: "Products", icon: Package },
 ];
 
@@ -186,9 +186,6 @@ function MobileNav({ onMore }: { onMore: () => void }) {
       <ul className="mx-auto flex h-16 max-w-lg items-stretch justify-around px-1">
         {MOBILE_NAV.map((item) => {
           const active = isActive(item.href);
-          // Create Bill is the reason the app exists on a phone, so it is the
-          // one target that reads as a button rather than a tab.
-          const primary = item.href === "/create-bill";
           return (
             <li key={item.href} className="flex flex-1 items-center justify-center">
               <Link
@@ -196,12 +193,10 @@ function MobileNav({ onMore }: { onMore: () => void }) {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex h-full w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[11px] font-medium",
-                  primary && "mx-1 -mt-4 h-[3.25rem] self-center rounded-xl bg-primary text-primary-foreground shadow-lg",
-                  !primary && active && "text-primary",
-                  !primary && !active && "text-muted-foreground",
+                  active ? "text-primary" : "text-muted-foreground",
                 )}
               >
-                <item.icon className={cn("h-5 w-5 shrink-0", primary && "h-6 w-6")} aria-hidden />
+                <item.icon className="h-5 w-5 shrink-0" aria-hidden />
                 <span className="truncate">{item.label}</span>
               </Link>
             </li>
