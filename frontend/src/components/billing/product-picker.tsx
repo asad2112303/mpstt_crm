@@ -18,22 +18,6 @@ import { cn } from "@/lib/utils";
 /** Selling units the business uses. Seeded by migration 0016. */
 const UNITS = ["PCS", "PKT", "ROLL", "BOX", "SET", "DOZ", "KG", "LTR"];
 
-/**
- * Swatch colours for the options people actually pick by eye.
- * The swatch is decoration: every option is also labelled and ticked when
- * selected, so colour is never the only way to tell them apart.
- */
-const SWATCHES: Record<string, string> = {
-  red: "#dc2626", yellow: "#eab308", black: "#171717", white: "#ffffff",
-  blue: "#2563eb", green: "#16a34a", orange: "#ea580c", grey: "#6b7280",
-  gray: "#6b7280", brown: "#92400e", pink: "#db2777", purple: "#7c3aed",
-  transparent: "#e5e7eb", clear: "#e5e7eb",
-};
-
-function swatchFor(value: string): string | null {
-  return SWATCHES[value.trim().toLowerCase()] ?? null;
-}
-
 function toBillingProduct(
   product: CatalogueProduct,
   variant: CatalogueVariant,
@@ -196,9 +180,9 @@ function NewProductForm({
  * Product picker.
  *
  * On a phone it takes the whole screen: the search field focuses itself, the
- * results are finger-sized rows, and options are chips and swatches rather
- * than a dropdown inside a dropdown. On a wide screen the same panel is
- * anchored under the trigger.
+ * results are finger-sized rows, and options are plain labelled buttons
+ * rather than a dropdown inside a dropdown. On a wide screen the same panel
+ * is anchored under the trigger.
  */
 export function ProductPicker({
   value,
@@ -408,7 +392,6 @@ export function ProductPicker({
                           (sum, v) => sum + Number(v.available ?? 0), 0,
                         );
                         const out = product.track_stock && stock <= 0;
-                        const swatch = swatchFor(option);
                         return (
                           <button
                             key={option}
@@ -417,19 +400,12 @@ export function ProductPicker({
                               choose(product, { ...chosen, [state.step!.key]: option })
                             }
                             className={cn(
-                              "flex min-h-16 items-center gap-2 rounded-lg border p-3 text-left",
+                              "min-h-14 rounded-lg border p-3 text-left",
                               out
                                 ? "border-border bg-muted/40 text-muted-foreground"
                                 : "border-border bg-card active:border-primary",
                             )}
                           >
-                            {swatch && (
-                              <span
-                                aria-hidden
-                                className="h-6 w-6 shrink-0 rounded-full border border-border"
-                                style={{ background: swatch }}
-                              />
-                            )}
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-medium">
                                 {option}
