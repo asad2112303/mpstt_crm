@@ -16,8 +16,6 @@ from app.models.invoices import Invoice
 from app.models.orders import SalesOrder
 from app.models.organization import Organization
 
-WALK_IN_LABEL = "Walk-in Customer"
-
 
 async def build_pdf_context(db: AsyncSession, invoice: Invoice) -> dict:
     """Everything the invoice template needs, resolved once at issue."""
@@ -26,11 +24,13 @@ async def build_pdf_context(db: AsyncSession, invoice: Invoice) -> dict:
     company = await _company_dict(db)
     org = await db.get(Organization, invoice.organization_id)
 
+    # A counter sale with no name given has no bill-to party at all, rather
+    # than a stand-in name printed where a customer should be.
     if invoice.is_walk_in:
-        customer_name = invoice.walk_in_name or WALK_IN_LABEL
+        customer_name = (invoice.walk_in_name or "").strip() or None
         customer_code = None
     else:
-        customer_name = org.name if org else WALK_IN_LABEL
+        customer_name = org.name if org else None
         customer_code = org.org_code if org else None
 
     context = {
@@ -39,7 +39,6 @@ async def build_pdf_context(db: AsyncSession, invoice: Invoice) -> dict:
             "number": invoice.invoice_number,
             "date": invoice.invoice_date.isoformat() if invoice.invoice_date else None,
             "due_date": invoice.due_date.isoformat() if invoice.due_date else None,
-            "terms_days": invoice.payment_terms_days,
             "reference": invoice.reference_number,
             "subtotal": invoice.subtotal,
             "discount_total": invoice.discount_total,
@@ -49,7 +48,6 @@ async def build_pdf_context(db: AsyncSession, invoice: Invoice) -> dict:
             "grand_total": invoice.grand_total,
             "currency": company.get("default_currency", "PKR"),
             "notes": invoice.notes,
-            "payment_terms_note": invoice.payment_terms_note,
             "is_direct": invoice.is_direct,
         },
         "customer": {

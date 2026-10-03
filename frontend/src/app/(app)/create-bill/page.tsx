@@ -128,7 +128,6 @@ function CreateBill() {
   );
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [termsNote, setTermsNote] = useState("");
   const [moreDetails, setMoreDetails] = useState(false);
 
   const [discountType, setDiscountType] = useState<"" | "percent" | "amount">("");
@@ -200,7 +199,6 @@ function CreateBill() {
     billing_address: billingAddress || null,
     delivery_address: deliveryAddress || null,
     notes: notes || null,
-    payment_terms_note: termsNote || null,
     overall_discount_type: discountType || null,
     overall_discount_value: discountValue || "0",
     delivery_charge: delivery || "0",
@@ -215,7 +213,7 @@ function CreateBill() {
       unit_cost: l.unit_cost || null,
     })),
   }), [mode, walkIn, walkInName, customer, invoiceDate, dueDate, reference, contactPerson,
-       contactPhone, billingAddress, deliveryAddress, notes, termsNote, discountType,
+       contactPhone, billingAddress, deliveryAddress, notes, discountType,
        discountValue, delivery, readyLines]);
 
   function validate(): string | null {
@@ -486,7 +484,7 @@ function CreateBill() {
             <div className="space-y-1.5">
               <Label htmlFor="cust">{walkIn ? "Customer name (optional)" : "Customer"}</Label>
               {walkIn ? (
-                <Input id="cust" value={walkInName} placeholder="Walk-in Customer"
+                <Input id="cust" value={walkInName} placeholder="Leave blank for a counter sale"
                   onChange={(e) => setWalkInName(e.target.value)} />
               ) : (
                 <CustomerCombobox selected={customer} onSelect={setCustomer} />
@@ -742,16 +740,9 @@ function CreateBill() {
               The discount is larger than the invoice total.
             </p>
           )}
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="notes">Notes on the invoice</Label>
-              <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="terms">Payment terms note</Label>
-              <Textarea id="terms" value={termsNote}
-                onChange={(e) => setTermsNote(e.target.value)} />
-            </div>
+          <div className="mt-3 space-y-1.5">
+            <Label htmlFor="notes">Notes on the invoice</Label>
+            <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         </div>
 
@@ -774,7 +765,7 @@ function CreateBill() {
 
           <p className="border-t border-border pt-3 text-xs text-muted-foreground">
             {walkIn
-              ? "A walk-in sale is settled in cash as it is billed."
+              ? "Settled in cash as it is billed."
               : "Record the payment under Payments when it arrives."}
           </p>
         </div>

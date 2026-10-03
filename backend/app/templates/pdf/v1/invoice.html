@@ -94,7 +94,13 @@
     {{ company.phone or "" }} &nbsp; | &nbsp; {{ company.email or "" }} &nbsp; | &nbsp; {{ company.website or "" }}
   </div>
 
+  {# A counter sale has no customer record and no terms: the boxes are only
+     drawn when there is something real to put in them. #}
+  {% set show_bill_to = customer.name %}
+  {% set show_payment = company.bank_details or customer.delivery_address %}
+  {% if show_bill_to or show_payment %}
   <div class="party-grid">
+    {% if show_bill_to %}
     <div class="party-box">
       <h4>BILL TO</h4>
       <div class="party-body">
@@ -106,16 +112,18 @@
         {% if customer.ntn %}NTN: {{ customer.ntn }}{% endif %}
       </div>
     </div>
+    {% endif %}
+    {% if show_payment %}
     <div class="party-box">
       <h4>PAYMENT</h4>
       <div class="party-body">
-        Terms: {% if invoice.terms_days %}{{ invoice.terms_days }} days{% else %}Due on receipt{% endif %}<br>
-        {% if invoice.payment_terms_note %}{{ invoice.payment_terms_note }}<br>{% endif %}
         {% if customer.delivery_address %}Deliver to: <span style="white-space: pre-wrap;">{{ customer.delivery_address }}</span><br>{% endif %}
         {% if company.bank_details %}<span style="white-space: pre-wrap;">{{ company.bank_details }}</span>{% endif %}
       </div>
     </div>
+    {% endif %}
   </div>
+  {% endif %}
 
   <div class="items-heading">Invoice Items</div>
   <table class="items">
