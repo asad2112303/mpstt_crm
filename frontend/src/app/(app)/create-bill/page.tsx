@@ -7,7 +7,7 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronDown,
-  Copy, Minus, Package, PackageX, Plus, Save, Trash2,
+  Copy, Download, Minus, Package, PackageX, Plus, Printer, Save, Trash2,
 } from "lucide-react";
 import { api, ApiError, newIdempotencyKey } from "@/lib/api";
 import {
@@ -16,7 +16,9 @@ import {
   type DraftLine, type Invoice, type QuickProductPayload,
 } from "@/lib/types/billing";
 import { CustomerCombobox } from "@/components/billing/customer-combobox";
-import { InvoiceActions } from "@/components/billing/invoice-share";
+import {
+  downloadInvoice, InvoiceActions, printInvoice,
+} from "@/components/billing/invoice-share";
 import { ProductPicker } from "@/components/billing/product-picker";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -118,7 +120,12 @@ function CreateBill() {
   const [billingAddress, setBillingAddress] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [reference, setReference] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState("");
+  // Today in Karachi, in the yyyy-mm-dd a date input expects. This subtree
+  // only ever renders on the client (useSearchParams bails out of prerender),
+  // so there is no server/client date to disagree about.
+  const [invoiceDate, setInvoiceDate] = useState(() =>
+    new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Karachi" }),
+  );
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [termsNote, setTermsNote] = useState("");
@@ -130,6 +137,8 @@ function CreateBill() {
 
   const [lines, setLines] = useState<DraftLine[]>([blankLine()]);
 
+  const [amountPaid, setAmountPaid] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [draftId, setDraftId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [issued, setIssued] = useState<Invoice | null>(null);
@@ -266,6 +275,8 @@ function CreateBill() {
 
   // --- submit -------------------------------------------------------------
   const [idemKey] = useState(newIdempotencyKey);
+  // Chosen before saving; run only once the server has confirmed the bill.
+  const [thenDo, setThenDo] = useState<"none" | "print" | "pdf">("none");
 
   const saveDraft = useMutation({
     mutationFn: async () => {
@@ -297,18 +308,23 @@ function CreateBill() {
           // One key for the life of this form, so a double tap or a retry
           // after a dropped connection cannot bill twice.
           idempotencyKey: idemKey,
-          body: {
-            // A counter sale is paid by definition, so it settles itself and
-            // never sits in receivables. A named customer is invoiced and
-            // pays through the Payments module.
-            amount_paid: walkIn ? totals.grand.toFixed(2) : null,
-            payment_method: "cash",
-          },
+          body: { amount_paid: amountPaid || null, payment_method: paymentMethod },
         })
       ).data;
     },
-    // Only a confirmed server response marks the bill finalized.
-    onSuccess: (invoice) => setIssued(invoice),
+    // Only a confirmed server response marks the bill finalized, and only
+    // then is there a document to print or download.
+    onSuccess: async (invoice) => {
+      setIssued(invoice);
+      const number = invoice.invoice_number ?? "invoice";
+      try {
+        if (thenDo === "print") await printInvoice(invoice.id, number);
+        if (thenDo === "pdf") await downloadInvoice(invoice.id, number);
+      } catch {
+        // The bill is saved either way; the success screen offers both again.
+        toast.error("Saved, but the PDF could not be prepared. Try again below.");
+      }
+    },
     onError: (e) =>
       toast.error(e instanceof ApiError ? e.message : "Could not finalize the bill."),
   });
@@ -480,6 +496,19 @@ function CreateBill() {
               )}
             </div>
 
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="idate-main">Bill date</Label>
+                <Input id="idate-main" type="date" value={invoiceDate}
+                  onChange={(e) => setInvoiceDate(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="phone-main">Phone (optional)</Label>
+                <Input id="phone-main" type="tel" inputMode="tel" autoComplete="tel"
+                  value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={() => setMoreDetails((v) => !v)}
@@ -501,18 +530,8 @@ function CreateBill() {
                     onChange={(e) => setContactPerson(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" type="tel" inputMode="tel" autoComplete="tel"
-                    value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
                   <Label htmlFor="ref">PO / reference</Label>
                   <Input id="ref" value={reference} onChange={(e) => setReference(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="idate">Invoice date</Label>
-                  <Input id="idate" type="date" value={invoiceDate}
-                    onChange={(e) => setInvoiceDate(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="ddate">Due date</Label>
@@ -756,11 +775,55 @@ function CreateBill() {
             <Row label="Invoice total" value={pkr(totals.grand)} strong />
           </div>
 
-          <p className="border-t border-border pt-3 text-xs text-muted-foreground">
-            {walkIn
-              ? "A walk-in sale is recorded as paid in full in cash."
-              : "This invoice is raised unpaid. Record the payment under Payments when it arrives."}
-          </p>
+          <div className="space-y-1.5 border-t border-border pt-3">
+            <Label htmlFor="paid">Amount received</Label>
+            <div className="flex gap-2">
+              <Input id="paid" inputMode="decimal" value={amountPaid} placeholder="0.00"
+                onChange={(e) => setAmountPaid(e.target.value)} />
+              <Button variant="outline" onClick={() => setAmountPaid(totals.grand.toFixed(2))}>
+                Full
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="method">Payment method</Label>
+            <select
+              id="method"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="h-11 w-full rounded-lg border border-input bg-transparent px-2 text-base md:h-8 md:text-sm"
+            >
+              <option value="cash">Cash</option>
+              <option value="bank_transfer">Bank transfer</option>
+              <option value="cheque">Cheque</option>
+              <option value="online">Online</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div className="border-t border-border pt-2">
+            <Row
+              label="Outstanding balance"
+              value={pkrExact(Math.max(totals.grand - Number(amountPaid || 0), 0))}
+              strong
+            />
+          </div>
+          {walkIn && (
+            <p className="text-xs text-muted-foreground">
+              A walk-in sale must be paid in full. Choose a saved customer to
+              leave a balance outstanding.
+            </p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 lg:hidden">
+          <Button variant="outline" disabled={busy || !!problem}
+            onClick={() => attempt(() => { setThenDo("print"); finalize.mutate(); })}>
+            <Printer className="mr-1.5 h-4 w-4" aria-hidden /> Save &amp; print
+          </Button>
+          <Button variant="outline" disabled={busy || !!problem}
+            onClick={() => attempt(() => { setThenDo("pdf"); finalize.mutate(); })}>
+            <Download className="mr-1.5 h-4 w-4" aria-hidden /> Save &amp; PDF
+          </Button>
         </div>
 
         {(shortages.length > 0 || missingCost.length > 0) && (
@@ -812,8 +875,8 @@ function CreateBill() {
               </Button>
             ) : (
               <Button size="lg" disabled={busy || !!problem}
-                onClick={() => attempt(() => finalize.mutate())}>
-                {finalize.isPending ? "Finalizing…" : "Finalize"}
+                onClick={() => attempt(() => { setThenDo("none"); finalize.mutate(); })}>
+                {finalize.isPending ? "Saving…" : "Save bill"}
               </Button>
             )}
           </span>
@@ -823,9 +886,17 @@ function CreateBill() {
               onClick={() => attempt(() => saveDraft.mutate())}>
               <Save className="mr-1.5 h-4 w-4" aria-hidden /> Save draft
             </Button>
+            <Button variant="outline" disabled={busy || !!problem}
+              onClick={() => attempt(() => { setThenDo("print"); finalize.mutate(); })}>
+              <Printer className="mr-1.5 h-4 w-4" aria-hidden /> Save &amp; print
+            </Button>
+            <Button variant="outline" disabled={busy || !!problem}
+              onClick={() => attempt(() => { setThenDo("pdf"); finalize.mutate(); })}>
+              <Download className="mr-1.5 h-4 w-4" aria-hidden /> Save &amp; PDF
+            </Button>
             <Button disabled={busy || !!problem}
-              onClick={() => attempt(() => finalize.mutate())}>
-              {finalize.isPending ? "Finalizing…" : "Finalize & bill"}
+              onClick={() => attempt(() => { setThenDo("none"); finalize.mutate(); })}>
+              {finalize.isPending ? "Saving…" : "Save bill"}
             </Button>
           </span>
         </div>

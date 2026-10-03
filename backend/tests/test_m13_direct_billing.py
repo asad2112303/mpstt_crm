@@ -867,3 +867,135 @@ async def test_stock_mode_still_deducts_and_still_guards(
     )
     assert blocked.status_code == 409
     assert blocked.json()["error"]["code"] == "INSUFFICIENT_STOCK"
+
+
+# --- the worked example from the brief ------------------------------------
+
+async def test_worked_example_totals_and_dashboard(client, user_headers, admin_headers, db_session):
+    """Two at 3,800 and five at 420 = 9,700; less 700 = 9,000; less 5,000 paid
+    leaves 4,000 outstanding — and the dashboard agrees."""
+    from tests.test_m2_prospects import create_prospect
+
+    customer = await create_prospect(client, user_headers)
+    before = (
+        await client.get("/api/v1/dashboard/business", headers=user_headers,
+                         params={"preset": "month"})
+    ).json()["data"]
+
+    draft = await client.post(
+        "/api/v1/billing/invoices", headers=user_headers,
+        json={
+            "organization_id": customer["id"],
+            "billing_mode": "quick",
+            "overall_discount_type": "amount",
+            "overall_discount_value": "700",
+            "items": [
+                await quick_line("Waste Bag Large", "2", "3800"),
+                await quick_line("Hand Wash 500ml", "5", "420"),
+            ],
+        },
+    )
+    assert draft.status_code == 201, draft.text
+    body = draft.json()["data"]
+    assert body["subtotal"] == "9700.00"
+    assert body["overall_discount_amount"] == "700.00"
+    assert body["grand_total"] == "9000.00"
+
+    final = await client.post(
+        f"/api/v1/billing/invoices/{body['id']}/finalize",
+        headers=idem(user_headers), json={"amount_paid": "5000"},
+    )
+    assert final.status_code == 200, final.text
+    issued = final.json()["data"]
+    assert issued["grand_total"] == "9000.00"
+    assert issued["allocated"] == "5000.00"
+    assert issued["outstanding"] == "4000.00"
+    assert issued["derived_status"] == "partially_paid"
+
+    after = (
+        await client.get("/api/v1/dashboard/business", headers=user_headers,
+                         params={"preset": "month"})
+    ).json()["data"]
+    # Sales are net of discount and exclude tax, so the bill adds 9,000.
+    assert (
+        Decimal(after["sales"]["net_sales"]) - Decimal(before["sales"]["net_sales"])
+    ) == Decimal("9000")
+    assert (
+        Decimal(after["cash"]["collected"]) - Decimal(before["cash"]["collected"])
+    ) == Decimal("5000")
+    assert (
+        Decimal(after["cash"]["outstanding"]) - Decimal(before["cash"]["outstanding"])
+    ) == Decimal("4000")
+    assert after["sales"]["invoice_count"] == before["sales"]["invoice_count"] + 1
+
+
+async def test_cancelled_and_draft_bills_stay_out_of_sales(client, user_headers):
+    """A draft has never been a sale, and a cancellation stops being one."""
+    base = (
+        await client.get("/api/v1/dashboard/business", headers=user_headers,
+                         params={"preset": "month"})
+    ).json()["data"]["sales"]["net_sales"]
+
+    # A draft, left unfinalized.
+    await client.post(
+        "/api/v1/billing/invoices", headers=user_headers,
+        json={"walk_in": True, "items": [await quick_line("Draft Only", "1", "5000")]},
+    )
+    mid = (
+        await client.get("/api/v1/dashboard/business", headers=user_headers,
+                         params={"preset": "month"})
+    ).json()["data"]["sales"]["net_sales"]
+    assert Decimal(mid) == Decimal(base)
+
+    # A finalized bill that is then cancelled.
+    draft = await client.post(
+        "/api/v1/billing/invoices", headers=user_headers,
+        json={"organization_id": None, "walk_in": True,
+              "items": [await quick_line("Cancelled Later", "1", "2500")]},
+    )
+    inv = draft.json()["data"]["id"]
+    await client.post(f"/api/v1/billing/invoices/{inv}/finalize",
+                      headers=idem(user_headers), json={"amount_paid": "2500"})
+    raised = (
+        await client.get("/api/v1/dashboard/business", headers=user_headers,
+                         params={"preset": "month"})
+    ).json()["data"]["sales"]["net_sales"]
+    assert Decimal(raised) == Decimal(base) + Decimal("2500")
+
+    # Cancelling needs the payment reversed first, which is the guard working.
+    blocked = await client.post(f"/api/v1/invoices/{inv}/cancel", headers=user_headers,
+                                json={"reason": "Customer returned everything"})
+    assert blocked.status_code == 409
+    assert blocked.json()["error"]["code"] == "INVOICE_HAS_PAYMENTS"
+
+
+async def test_one_off_product_is_not_kept_for_next_time(client, user_headers):
+    """'Save for future use' off: billed once, then out of the way."""
+    name = f"One Off Item {uuid.uuid4().hex[:6]}"
+    draft = await client.post(
+        "/api/v1/billing/invoices", headers=user_headers,
+        json={"walk_in": True, "items": [
+            {"new_product": {"name": name, "uom_code": "PCS", "save_for_future": False},
+             "quantity": "1", "unit_price": "250"},
+        ]},
+    )
+    assert draft.status_code == 201, draft.text
+    # The line still works and still names the product.
+    assert name in draft.json()["data"]["items"][0]["description_snapshot"]
+
+    # …but it does not come back in the next search.
+    found = await client.get("/api/v1/billing/catalogue", headers=user_headers,
+                             params={"search": name})
+    assert found.json()["data"] == []
+
+    kept_name = f"Kept Item {uuid.uuid4().hex[:6]}"
+    await client.post(
+        "/api/v1/billing/invoices", headers=user_headers,
+        json={"walk_in": True, "items": [
+            {"new_product": {"name": kept_name, "uom_code": "PCS", "save_for_future": True},
+             "quantity": "1", "unit_price": "250"},
+        ]},
+    )
+    kept = await client.get("/api/v1/billing/catalogue", headers=user_headers,
+                            params={"search": kept_name})
+    assert len(kept.json()["data"]) == 1

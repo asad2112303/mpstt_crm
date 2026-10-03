@@ -88,6 +88,9 @@ class QuickProductIn(BaseModel):
     # Off by default: a Quick Bill product must not invent a stock balance.
     track_stock: bool = False
     opening_quantity: Decimal | None = Field(default=None, ge=0)
+    # A one-off line still needs a catalogue row — the invoice references it by
+    # id — but it is retired immediately so it never clutters a future search.
+    save_for_future: bool = True
 
     @model_validator(mode="after")
     def _opening_needs_tracking(self):
@@ -355,6 +358,7 @@ async def create_quick_product(
         default_sale_price=payload.sale_price,
         default_purchase_cost=payload.purchase_cost,
         created_via="quick_bill",
+        is_active=payload.save_for_future,
         created_by=uuid.UUID(user_id),
     )
     db.add(product)
@@ -376,6 +380,7 @@ async def create_quick_product(
         attributes=attributes,
         standard_cost=payload.purchase_cost,
         last_sale_price=payload.sale_price,
+        is_active=payload.save_for_future,
         created_by=uuid.UUID(user_id),
     )
     db.add(variant)
@@ -384,7 +389,8 @@ async def create_quick_product(
 
     await write_audit(
         db, action="product.quick_created", entity_type="product", entity_id=product.id,
-        new={"sku": sku, "name": product.name, "track_stock": product.track_stock},
+        new={"sku": sku, "name": product.name, "track_stock": product.track_stock,
+             "saved_for_future": payload.save_for_future},
     )
     return variant
 

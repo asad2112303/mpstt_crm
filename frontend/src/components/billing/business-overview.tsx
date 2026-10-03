@@ -322,17 +322,33 @@ export function BusinessOverview() {
                 <li key={inv.id}>
                   <Link
                     href={`/invoices/${inv.id}`}
-                    className="flex flex-wrap items-center gap-3 p-3 text-sm hover:bg-muted/50"
+                    className="block p-3 text-sm hover:bg-muted/50"
                   >
-                    <span className="font-medium text-primary">{inv.invoice_number}</span>
-                    <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                      {inv.customer_name}
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="min-w-0">
+                        <span className="font-medium text-primary">{inv.invoice_number}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {inv.invoice_date} · {inv.customer_name}
+                        </span>
+                      </span>
+                      <Badge className={cn("border-transparent", PAYMENT_TONE[inv.payment_status])}>
+                        {inv.payment_status.replace("_", " ")}
+                      </Badge>
                     </span>
-                    {inv.is_direct && <Badge variant="outline">Direct</Badge>}
-                    <Badge className={cn("border-transparent", PAYMENT_TONE[inv.payment_status])}>
-                      {inv.payment_status.replace("_", " ")}
-                    </Badge>
-                    <span className="tabular-nums">{pkrExact(inv.grand_total)}</span>
+                    <span className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+                      <span>
+                        Total{" "}
+                        <strong className="text-foreground tabular-nums">
+                          {pkrExact(inv.grand_total)}
+                        </strong>
+                      </span>
+                      <span>
+                        Received <span className="tabular-nums">{pkrExact(inv.received)}</span>
+                      </span>
+                      <span>
+                        Balance <span className="tabular-nums">{pkrExact(inv.outstanding)}</span>
+                      </span>
+                    </span>
                   </Link>
                 </li>
               ))}

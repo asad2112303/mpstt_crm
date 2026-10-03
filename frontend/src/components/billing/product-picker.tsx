@@ -65,14 +65,14 @@ function NewProductForm({
   const [size, setSize] = useState("");
   const [track, setTrack] = useState(false);
   const [opening, setOpening] = useState("");
+  const [keep, setKeep] = useState(true);
 
   const valid = productName.trim().length > 0;
 
   return (
     <div className="space-y-4 p-4">
       <p className="text-sm text-muted-foreground">
-        Only the name, unit and price are needed. It is saved to the catalogue
-        so you can pick it next time.
+        Only the name, unit and price are needed.
       </p>
 
       <div className="space-y-1.5">
@@ -131,6 +131,17 @@ function NewProductForm({
       </div>
 
       <label className="flex items-start gap-3 rounded-lg bg-muted/50 p-3 text-sm">
+        <Checkbox checked={keep} onCheckedChange={(v) => setKeep(v === true)} />
+        <span>
+          Save for future use
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            Keeps it in the catalogue so you can pick it next time. Turn off for
+            a one-off — the bill still shows it either way.
+          </span>
+        </span>
+      </label>
+
+      <label className="flex items-start gap-3 rounded-lg bg-muted/50 p-3 text-sm">
         <Checkbox checked={track} onCheckedChange={(v) => setTrack(v === true)} />
         <span>
           Track stock for this product
@@ -140,6 +151,13 @@ function NewProductForm({
           </span>
         </span>
       </label>
+
+      {track && !keep && (
+        <p className="text-xs text-destructive">
+          Tracking stock needs the product kept — turn &ldquo;Save for future
+          use&rdquo; back on.
+        </p>
+      )}
 
       {track && (
         <div className="space-y-1.5">
@@ -153,7 +171,7 @@ function NewProductForm({
         <Button variant="outline" className="flex-1" onClick={onCancel}>Cancel</Button>
         <Button
           className="flex-1"
-          disabled={!valid}
+          disabled={!valid || (track && !keep)}
           onClick={() =>
             onCreate({
               name: productName.trim(),
@@ -164,6 +182,7 @@ function NewProductForm({
               size: size || null,
               track_stock: track,
               opening_quantity: track && opening ? opening : null,
+              save_for_future: keep,
             })
           }
         >

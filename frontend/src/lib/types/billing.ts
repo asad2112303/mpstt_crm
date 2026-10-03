@@ -123,6 +123,8 @@ export interface QuickProductPayload {
   tax_rate?: string;
   track_stock?: boolean;
   opening_quantity?: string | null;
+  /** Off for a one-off line: it still bills, it just stops cluttering search. */
+  save_for_future?: boolean;
 }
 
 /** A line as the user is editing it, before it becomes an invoice item. */
@@ -259,7 +261,7 @@ export interface BusinessBreakdown {
   }[];
   recent_invoices: {
     id: string; invoice_number: string | null; invoice_date: string | null;
-    customer_name: string; grand_total: string; outstanding: string;
+    customer_name: string; grand_total: string; received: string; outstanding: string;
     payment_status: "paid" | "partially_paid" | "overdue" | "unpaid";
     is_direct: boolean;
   }[];

@@ -696,6 +696,7 @@ async def business_breakdown(
                         else r["customer_name"]
                     ),
                     "grand_total": str(round(r["grand_total"], 2)),
+                    "received": str(round(r["allocated"], 2)),
                     "outstanding": str(round(r["grand_total"] - r["allocated"], 2)),
                     "payment_status": payment_state(r),
                     "is_direct": r["is_direct"],

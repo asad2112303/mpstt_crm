@@ -15,6 +15,38 @@ import { Button } from "@/components/ui/button";
  * through the operating system's own share sheet, where the user picks the
  * app and the recipient.
  */
+/** The invoice PDF as a file, with the same auth as any other call. */
+export async function fetchInvoiceFile(
+  invoiceId: string,
+  invoiceNumber: string,
+): Promise<File> {
+  const blob = await apiBlob(`/api/v1/invoices/${invoiceId}/pdf`);
+  return new File([blob], `${invoiceNumber}.pdf`, { type: "application/pdf" });
+}
+
+export async function downloadInvoice(invoiceId: string, invoiceNumber: string) {
+  const file = await fetchInvoiceFile(invoiceId, invoiceNumber);
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function printInvoice(invoiceId: string, invoiceNumber: string) {
+  const file = await fetchInvoiceFile(invoiceId, invoiceNumber);
+  const url = URL.createObjectURL(file);
+  // A tab rather than a hidden iframe: mobile browsers refuse to print from
+  // iframes, and this leaves the user somewhere sensible either way.
+  const w = window.open(url, "_blank");
+  if (!w) {
+    toast.error("Allow pop-ups to print, or download the PDF instead.");
+    return;
+  }
+  w.addEventListener("load", () => w.print(), { once: true });
+}
+
 export function InvoiceActions({
   invoiceId,
   invoiceNumber,
@@ -26,10 +58,7 @@ export function InvoiceActions({
 }) {
   const [busy, setBusy] = useState<"download" | "print" | "share" | null>(null);
 
-  async function getFile(): Promise<File> {
-    const blob = await apiBlob(`/api/v1/invoices/${invoiceId}/pdf`);
-    return new File([blob], `${invoiceNumber}.pdf`, { type: "application/pdf" });
-  }
+  const getFile = () => fetchInvoiceFile(invoiceId, invoiceNumber);
 
   function fail(e: unknown) {
     toast.error(e instanceof ApiError ? e.message : "Could not prepare the invoice.");
@@ -38,13 +67,7 @@ export function InvoiceActions({
   async function download() {
     setBusy("download");
     try {
-      const file = await getFile();
-      const url = URL.createObjectURL(file);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = file.name;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadInvoice(invoiceId, invoiceNumber);
     } catch (e) {
       fail(e);
     } finally {
@@ -55,13 +78,7 @@ export function InvoiceActions({
   async function print() {
     setBusy("print");
     try {
-      const file = await getFile();
-      const url = URL.createObjectURL(file);
-      // A new tab rather than a hidden iframe: mobile browsers block printing
-      // from iframes, and this leaves the user somewhere sensible either way.
-      const w = window.open(url, "_blank");
-      if (!w) toast.error("Allow pop-ups to print, or download the PDF instead.");
-      else w.addEventListener("load", () => w.print(), { once: true });
+      await printInvoice(invoiceId, invoiceNumber);
     } catch (e) {
       fail(e);
     } finally {
