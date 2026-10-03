@@ -166,21 +166,10 @@
   {% endif %}
 
   <div class="total-band">
-    <span>INVOICE TOTAL</span>
+    <span>AMOUNT DUE</span>
     <span class="amount">{{ invoice.currency }} {{ invoice.grand_total | money }}</span>
   </div>
 
-  {% if payment and payment.amount_paid | num > 0 %}
-  <table class="pretotals">
-    <tr><td class="label" style="width:80%">Payment received</td><td class="num">-{{ payment.amount_paid | money }}</td></tr>
-    <tr>
-      <td class="label" style="font-weight:700; color:#075E59;">
-        {% if payment.fully_paid %}Balance — PAID IN FULL{% else %}Balance due{% endif %}
-      </td>
-      <td class="num" style="font-weight:700;">{{ invoice.currency }} {{ payment.balance_due | money }}</td>
-    </tr>
-  </table>
-  {% endif %}
 
   <div class="bottom-grid">
     <div class="notes-box">

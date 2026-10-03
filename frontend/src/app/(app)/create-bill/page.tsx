@@ -137,8 +137,6 @@ function CreateBill() {
 
   const [lines, setLines] = useState<DraftLine[]>([blankLine()]);
 
-  const [amountPaid, setAmountPaid] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [draftId, setDraftId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [issued, setIssued] = useState<Invoice | null>(null);
@@ -308,7 +306,13 @@ function CreateBill() {
           // One key for the life of this form, so a double tap or a retry
           // after a dropped connection cannot bill twice.
           idempotencyKey: idemKey,
-          body: { amount_paid: amountPaid || null, payment_method: paymentMethod },
+          body: {
+            // Nothing is typed at billing time. A counter sale is paid by
+            // definition, so it settles itself rather than sitting in
+            // receivables; a named customer pays through the Payments module.
+            amount_paid: walkIn ? totals.grand.toFixed(2) : null,
+            payment_method: "cash",
+          },
         })
       ).data;
     },
@@ -350,13 +354,6 @@ function CreateBill() {
           <h1 className="mt-2 text-lg font-semibold">{issued.invoice_number}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Finalized · {pkr(issued.grand_total)}
-          </p>
-          <p className="mt-1 text-sm">
-            {Number(issued.outstanding) > 0 ? (
-              <>Balance due <strong>{pkrExact(issued.outstanding)}</strong></>
-            ) : (
-              <span className="text-primary">Paid in full</span>
-            )}
           </p>
           {issued.stock?.stock_moved && (
             <p className="mt-2 text-xs text-muted-foreground">
@@ -775,44 +772,11 @@ function CreateBill() {
             <Row label="Invoice total" value={pkr(totals.grand)} strong />
           </div>
 
-          <div className="space-y-1.5 border-t border-border pt-3">
-            <Label htmlFor="paid">Amount received</Label>
-            <div className="flex gap-2">
-              <Input id="paid" inputMode="decimal" value={amountPaid} placeholder="0.00"
-                onChange={(e) => setAmountPaid(e.target.value)} />
-              <Button variant="outline" onClick={() => setAmountPaid(totals.grand.toFixed(2))}>
-                Full
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="method">Payment method</Label>
-            <select
-              id="method"
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-              className="h-11 w-full rounded-lg border border-input bg-transparent px-2 text-base md:h-8 md:text-sm"
-            >
-              <option value="cash">Cash</option>
-              <option value="bank_transfer">Bank transfer</option>
-              <option value="cheque">Cheque</option>
-              <option value="online">Online</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div className="border-t border-border pt-2">
-            <Row
-              label="Outstanding balance"
-              value={pkrExact(Math.max(totals.grand - Number(amountPaid || 0), 0))}
-              strong
-            />
-          </div>
-          {walkIn && (
-            <p className="text-xs text-muted-foreground">
-              A walk-in sale must be paid in full. Choose a saved customer to
-              leave a balance outstanding.
-            </p>
-          )}
+          <p className="border-t border-border pt-3 text-xs text-muted-foreground">
+            {walkIn
+              ? "A walk-in sale is settled in cash as it is billed."
+              : "Record the payment under Payments when it arrives."}
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2 lg:hidden">

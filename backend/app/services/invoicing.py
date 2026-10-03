@@ -4,12 +4,11 @@ Order-driven invoices and direct (Quick Bill / Sell from Stock) invoices
 render the same template from the same context builder, so the customer sees
 one consistent document no matter how the sale was entered.
 
-The context is frozen onto the invoice at issue. Payment figures are the one
-exception: they are merged in live at download time, because what has been
-paid keeps changing after the invoice is issued.
+The context is frozen onto the invoice at issue. The document states what is
+owed; what has been paid against it lives in the CRM, not on the customer's
+copy.
 """
 import uuid
-from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,16 +17,6 @@ from app.models.orders import SalesOrder
 from app.models.organization import Organization
 
 WALK_IN_LABEL = "Walk-in Customer"
-
-
-def payment_context(grand_total: Decimal, allocated: Decimal) -> dict:
-    """Live payment figures, merged over the frozen document at render time."""
-    paid = allocated or Decimal("0")
-    return {
-        "amount_paid": paid,
-        "balance_due": grand_total - paid,
-        "fully_paid": paid >= grand_total,
-    }
 
 
 async def build_pdf_context(db: AsyncSession, invoice: Invoice) -> dict:
@@ -74,9 +63,6 @@ async def build_pdf_context(db: AsyncSession, invoice: Invoice) -> dict:
             "delivery_address": invoice.delivery_address,
         },
         "order_number": None,
-        # Placeholder so the template always has the key: the real figures are
-        # merged in at download time, because payment keeps moving after issue.
-        "payment": payment_context(invoice.grand_total, Decimal("0")),
         "items": [
             {
                 "sn": item.sort_order + 1,

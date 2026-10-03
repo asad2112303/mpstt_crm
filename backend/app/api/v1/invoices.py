@@ -26,7 +26,7 @@ from app.models.organization import CustomerProfile, Organization
 from app.services.audit import write_audit
 from app.services.billing import reverse_stock
 from app.services.idempotency import require_idempotency_key, run_idempotent
-from app.services.invoicing import build_pdf_context, payment_context
+from app.services.invoicing import build_pdf_context
 from app.services.numbering import allocate_number
 from app.services.pdf import freeze_context, render_html, render_pdf
 
@@ -417,14 +417,7 @@ async def invoice_pdf(
 ):
     invoice = await _get_invoice(db, invoice_id)
     if invoice.pdf_context:
-        # The document is frozen, but what has been paid keeps moving, so the
-        # payment block is resolved fresh on every download.
-        allocated = await allocated_amount(db, invoice.id)
-        context = {
-            **invoice.pdf_context,
-            "payment": payment_context(invoice.grand_total, allocated),
-        }
-        content = render_pdf("invoice.html", context)
+        content = render_pdf("invoice.html", invoice.pdf_context)
         filename = f"{invoice.invoice_number}.pdf"
     elif invoice.pdf_document_id:
         # Invoices issued before snapshots: still served from storage.
