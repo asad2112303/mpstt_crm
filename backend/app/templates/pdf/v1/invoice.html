@@ -75,11 +75,9 @@
     </div>
     <div class="qpanel">
       <div class="qtitle">INVOICE</div>
-      <div class="qsub">Tax Invoice</div>
       <table class="qmeta">
         <tr><td class="label">Invoice No</td><td class="value">{{ invoice.number }}</td></tr>
         <tr><td class="label">Date</td><td class="value">{{ invoice.date }}</td></tr>
-        <tr><td class="label">Due Date</td><td class="value">{{ invoice.due_date }}</td></tr>
         {% if order_number %}
         <tr><td class="label">Order Ref</td><td class="value">{{ order_number }}</td></tr>
         {% endif %}
@@ -91,7 +89,10 @@
   </div>
 
   <div class="contact-strip">
-    {{ company.phone or "" }} &nbsp; | &nbsp; {{ company.email or "" }} &nbsp; | &nbsp; {{ company.website or "" }}
+    {# Only the details that exist, so a missing one leaves no stray divider. #}
+    {%- for bit in [company.phone, company.email, company.website] if bit -%}
+      {{ bit }}{% if not loop.last %} &nbsp; | &nbsp; {% endif %}
+    {%- endfor -%}
   </div>
 
   {# A counter sale has no customer record and no terms: the boxes are only

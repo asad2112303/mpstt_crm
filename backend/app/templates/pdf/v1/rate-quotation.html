@@ -139,7 +139,10 @@
   </div>
 
   <div class="contact-strip">
-    {{ company.phone or "" }} &nbsp; | &nbsp; {{ company.email or "" }} &nbsp; | &nbsp; {{ company.website or "" }}
+    {# Only the details that exist, so a missing one leaves no stray divider. #}
+    {%- for bit in [company.phone, company.email, company.website] if bit -%}
+      {{ bit }}{% if not loop.last %} &nbsp; | &nbsp; {% endif %}
+    {%- endfor -%}
   </div>
 
   {% if customer.name %}
