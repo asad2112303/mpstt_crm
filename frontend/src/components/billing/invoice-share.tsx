@@ -15,17 +15,14 @@ import { Button } from "@/components/ui/button";
  * through the operating system's own share sheet, where the user picks the
  * app and the recipient.
  */
-/** The invoice PDF as a file, with the same auth as any other call. */
-export async function fetchInvoiceFile(
-  invoiceId: string,
-  invoiceNumber: string,
-): Promise<File> {
-  const blob = await apiBlob(`/api/v1/invoices/${invoiceId}/pdf`);
-  return new File([blob], `${invoiceNumber}.pdf`, { type: "application/pdf" });
+/** Any server-rendered PDF as a file, with the same auth as any other call. */
+export async function fetchDocument(path: string, filename: string): Promise<File> {
+  const blob = await apiBlob(path);
+  return new File([blob], `${filename}.pdf`, { type: "application/pdf" });
 }
 
-export async function downloadInvoice(invoiceId: string, invoiceNumber: string) {
-  const file = await fetchInvoiceFile(invoiceId, invoiceNumber);
+export async function downloadDocument(path: string, filename: string) {
+  const file = await fetchDocument(path, filename);
   const url = URL.createObjectURL(file);
   const a = document.createElement("a");
   a.href = url;
@@ -34,8 +31,8 @@ export async function downloadInvoice(invoiceId: string, invoiceNumber: string) 
   URL.revokeObjectURL(url);
 }
 
-export async function printInvoice(invoiceId: string, invoiceNumber: string) {
-  const file = await fetchInvoiceFile(invoiceId, invoiceNumber);
+export async function printDocument(path: string, filename: string) {
+  const file = await fetchDocument(path, filename);
   const url = URL.createObjectURL(file);
   // A tab rather than a hidden iframe: mobile browsers refuse to print from
   // iframes, and this leaves the user somewhere sensible either way.
@@ -47,18 +44,33 @@ export async function printInvoice(invoiceId: string, invoiceNumber: string) {
   w.addEventListener("load", () => w.print(), { once: true });
 }
 
+const invoicePath = (id: string) => `/api/v1/invoices/${id}/pdf`;
+
+export const fetchInvoiceFile = (id: string, number: string) =>
+  fetchDocument(invoicePath(id), number);
+export const downloadInvoice = (id: string, number: string) =>
+  downloadDocument(invoicePath(id), number);
+export const printInvoice = (id: string, number: string) =>
+  printDocument(invoicePath(id), number);
+
 export function InvoiceActions({
   invoiceId,
   invoiceNumber,
   className,
+  pdfPath,
+  label = "The customer\u2019s PDF shows prices only — purchase cost and profit are never on it.",
 }: {
   invoiceId: string;
   invoiceNumber: string;
   className?: string;
+  /** Defaults to the invoice PDF; a rate list passes its own path. */
+  pdfPath?: string;
+  label?: string;
 }) {
   const [busy, setBusy] = useState<"download" | "print" | "share" | null>(null);
 
-  const getFile = () => fetchInvoiceFile(invoiceId, invoiceNumber);
+  const path = pdfPath ?? invoicePath(invoiceId);
+  const getFile = () => fetchDocument(path, invoiceNumber);
 
   function fail(e: unknown) {
     toast.error(e instanceof ApiError ? e.message : "Could not prepare the invoice.");
@@ -67,7 +79,7 @@ export function InvoiceActions({
   async function download() {
     setBusy("download");
     try {
-      await downloadInvoice(invoiceId, invoiceNumber);
+      await downloadDocument(path, invoiceNumber);
     } catch (e) {
       fail(e);
     } finally {
@@ -78,7 +90,7 @@ export function InvoiceActions({
   async function print() {
     setBusy("print");
     try {
-      await printInvoice(invoiceId, invoiceNumber);
+      await printDocument(path, invoiceNumber);
     } catch (e) {
       fail(e);
     } finally {
@@ -126,10 +138,7 @@ export function InvoiceActions({
           Share
         </Button>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">
-        The customer&rsquo;s PDF shows prices only — purchase cost and profit are
-        never on it.
-      </p>
+      <p className="mt-2 text-xs text-muted-foreground">{label}</p>
     </div>
   );
 }

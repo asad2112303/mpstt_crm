@@ -304,3 +304,37 @@ export function lineAmounts(line: {
   const tax = (net * Number(line.tax_rate || 0)) / 100;
   return { gross, discount, net, tax, total: net + tax };
 }
+
+
+/** A published price list: products and what each costs per unit. */
+export interface RateQuotationItem {
+  id: string;
+  product_id: string;
+  product_variant_id: string;
+  description_snapshot: string;
+  specification_snapshot: Record<string, string | number | boolean>;
+  uom_code: string;
+  unit_price: string;
+  sort_order: number;
+}
+
+export interface RateQuotation {
+  id: string;
+  quotation_number: string;
+  organization_id: string | null;
+  customer_name: string | null;
+  contact_person: string | null;
+  contact_phone: string | null;
+  quote_date: string;
+  valid_until: string | null;
+  status: "issued" | "cancelled";
+  notes: string | null;
+  items: RateQuotationItem[];
+}
+
+/** A line being edited. There is deliberately no quantity. */
+export interface RateLine {
+  key: string;
+  product?: BillingProduct;
+  unit_price: string;
+}

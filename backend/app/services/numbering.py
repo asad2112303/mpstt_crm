@@ -17,6 +17,7 @@ PREFIXES = {
     "ORG": "ORG",
     "CUST": "CUST",
     "QT": "QT",
+    "RQ": "RQ",
     "ORD": "ORD",
     "INV": "INV",
     "DC": "DC",

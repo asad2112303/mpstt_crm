@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+{# Rate quotation: products and what each costs per unit.
+
+   Deliberately no Qty column, no Amount column and no total band — there are
+   no quantities to price, so there is nothing to add up. Printing a total of
+   unit rates would be a meaningless number and an invitation to misread it
+   as an order value. #}
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @page {
+    size: A4;
+    margin: 12mm 14mm 24mm 14mm;
+    background: url("v1/assets/mpstt-wave.png") no-repeat bottom center;
+    background-size: 100% auto;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Poppins", "DejaVu Sans", sans-serif;
+    font-size: 9.5pt; color: #263238; margin: 0;
+  }
+
+  /* ---------- header ---------- */
+  .header { display: flex; justify-content: space-between; align-items: stretch; }
+  .brand { display: flex; align-items: center; gap: 10pt; }
+  .brand img { width: 21mm; height: auto; }
+  .brand-title { font-size: 20pt; font-weight: 700; color: #087F74; line-height: 1; }
+  .brand-sub { font-size: 8pt; font-weight: 600; color: #075E59; letter-spacing: 0.04em; margin-top: 3pt; }
+  .qpanel {
+    background: #087F74; color: #FFFFFF; border-radius: 5pt;
+    padding: 8pt 12pt; min-width: 62mm;
+  }
+  .qpanel .qtitle { font-size: 15pt; font-weight: 700; letter-spacing: 0.08em; }
+  .qpanel .qsub { font-size: 8.5pt; color: #7BCBB8; margin-bottom: 5pt; }
+  .qmeta { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  .qmeta td { padding: 1.5pt 0; }
+  .qmeta td.label { color: #7BCBB8; padding-right: 8pt; white-space: nowrap; }
+  .qmeta td.value { color: #FFFFFF; font-weight: 600; text-align: right; }
+
+  /* ---------- contact strip ---------- */
+  .contact-strip {
+    text-align: center; font-weight: 700; font-size: 8.5pt; color: #075E59;
+    border-top: 1pt solid #EAF4F2; border-bottom: 1pt solid #EAF4F2;
+    padding: 5pt 0; margin: 8pt 0 10pt;
+  }
+
+  /* ---------- party boxes ---------- */
+  .party-grid { display: flex; gap: 8pt; }
+  .party-box { flex: 1; border: 0.8pt solid #EAF4F2; border-radius: 5pt; overflow: hidden; }
+  .party-box h4 {
+    margin: 0; background: #087F74; color: #FFFFFF; font-size: 8pt;
+    letter-spacing: 0.1em; padding: 4pt 8pt; font-weight: 700;
+  }
+  .party-body { background: #F7FAF9; padding: 6pt 8pt; font-size: 9pt; line-height: 1.45; }
+  .party-body .strong { font-weight: 700; color: #075E59; }
+
+  /* ---------- items ---------- */
+  .items-heading { font-weight: 700; color: #075E59; margin: 11pt 0 4pt; font-size: 10.5pt; }
+  table.items { width: 100%; border-collapse: collapse; }
+  table.items th {
+    background: #087F74; color: #FFFFFF; font-size: 8.5pt; font-weight: 700;
+    padding: 5pt 6pt; text-align: left;
+  }
+  table.items th.num, table.items td.num { text-align: right; }
+  table.items td {
+    padding: 5pt 6pt; border-bottom: 0.6pt solid #EAF4F2; vertical-align: top;
+    font-size: 9pt;
+  }
+  table.items tr:nth-child(even) td { background: #F5F9F8; }
+  table.items tr { page-break-inside: avoid; }
+  .prod-name { font-weight: 600; }
+  .prod-spec { font-size: 7.8pt; color: #6B7474; margin-top: 1pt; }
+
+  /* ---------- totals ---------- */
+  table.pretotals { width: 100%; border-collapse: collapse; margin-top: 4pt; font-size: 8.5pt; }
+  table.pretotals td { padding: 2pt 6pt; }
+  table.pretotals td.num { text-align: right; }
+  table.pretotals td.label { text-align: right; color: #6B7474; }
+  .total-band {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #075E59; color: #FFFFFF; border-radius: 4pt;
+    padding: 6pt 10pt; margin-top: 5pt; font-weight: 700;
+  }
+  .total-band .amount { font-size: 12pt; }
+
+  /* ---------- notes / signature ---------- */
+  .bottom-grid { display: flex; gap: 8pt; margin-top: 12pt; page-break-inside: avoid; }
+  .notes-box {
+    flex: 1.4; border: 0.8pt solid #EAF4F2; border-radius: 5pt;
+    background: #F7FAF9; padding: 7pt 9pt; font-size: 8pt; color: #263238;
+  }
+  .notes-box h4 { margin: 0 0 3pt; font-size: 8.5pt; color: #075E59; }
+  .notes-box ul { margin: 0; padding-left: 10pt; }
+  .notes-box li { margin-bottom: 2pt; }
+  .sign-box {
+    flex: 1; border: 0.8pt solid #EAF4F2; border-radius: 5pt;
+    padding: 7pt 9pt; font-size: 8.5pt; display: flex; flex-direction: column;
+    justify-content: space-between;
+  }
+  .sign-box .for { font-weight: 700; color: #075E59; }
+  .sign-line { border-top: 0.8pt solid #263238; margin-top: 22pt; padding-top: 2pt; }
+
+  .thanks {
+    text-align: center; margin-top: 12pt; font-weight: 600; color: #087F74;
+    font-size: 9pt;
+  }
+</style>
+<style>
+  table.items th.rate, table.items td.rate { text-align: right; }
+  .rate-note {
+    margin-top: 10pt; padding: 7pt 9pt; border-radius: 5pt;
+    background: #F7FAF9; border: 0.8pt solid #EAF4F2;
+    font-size: 9pt; color: #263238;
+  }
+  .validity { font-size: 9pt; color: #6B7474; margin-top: 6pt; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <img src="v1/assets/mpstt-logo.png" alt="MPSTT logo">
+      <div>
+        <div class="brand-title">MPSTT</div>
+        <div class="brand-sub">MEDICAL PRISM SUPPLIES FOR<br>TREATMENT AND TECHNOLOGY</div>
+      </div>
+    </div>
+    <div class="qpanel">
+      <div class="qtitle">RATE LIST</div>
+      <div class="qsub">Quotation of Rates</div>
+      <table class="qmeta">
+        <tr><td class="label">Ref No</td><td class="value">{{ quote.number }}</td></tr>
+        <tr><td class="label">Date</td><td class="value">{{ quote.date }}</td></tr>
+        {% if quote.valid_until %}
+        <tr><td class="label">Valid Until</td><td class="value">{{ quote.valid_until }}</td></tr>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+
+  <div class="contact-strip">
+    {{ company.phone or "" }} &nbsp; | &nbsp; {{ company.email or "" }} &nbsp; | &nbsp; {{ company.website or "" }}
+  </div>
+
+  {% if customer.name %}
+  <div class="party-grid">
+    <div class="party-box">
+      <h4>PREPARED FOR</h4>
+      <div class="party-body">
+        <span class="strong">{{ customer.name }}</span><br>
+        {% if customer.contact_person %}Attn: {{ customer.contact_person }}<br>{% endif %}
+        {% if customer.city %}{{ customer.city }}<br>{% endif %}
+        {% if customer.phone %}{{ customer.phone }}{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="items-heading">Rates</div>
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:8%">No.</th>
+        <th style="width:57%">Product / Specification</th>
+        <th style="width:15%">Unit</th>
+        <th class="rate" style="width:20%">Rate ({{ quote.currency }})</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>{{ item.sn }}</td>
+        <td>
+          <div class="prod-name">{{ item.description }}</div>
+          {% if item.specification %}
+          <div class="prod-spec">
+            {% for key, value in item.specification.items() %}{{ key | replace("_", " ") }}: {{ value }}{% if not loop.last %} · {% endif %}{% endfor %}
+          </div>
+          {% endif %}
+        </td>
+        <td>per {{ item.uom }}</td>
+        <td class="rate">{{ item.unit_price | money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="rate-note">
+    Rates are quoted per unit as shown. This is a price list, not an order —
+    quantities and totals are confirmed on a purchase order or invoice.
+  </div>
+
+  {% if quote.valid_until %}
+  <div class="validity">Rates valid until {{ quote.valid_until }}.</div>
+  {% endif %}
+
+  <div class="bottom-grid">
+    <div class="notes-box">
+      <h4>Notes</h4>
+      <ul style="margin:0; padding-left:10pt;">
+        {% if quote.notes %}<li>{{ quote.notes }}</li>{% endif %}
+        <li>Rates are subject to change after the validity date.</li>
+      </ul>
+    </div>
+    <div class="sign-box">
+      <div class="for">For MPSTT</div>
+      <div>
+        <div class="sign-line">Authorized Signature / Stamp</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
