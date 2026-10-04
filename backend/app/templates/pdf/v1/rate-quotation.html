@@ -14,6 +14,18 @@
     margin: 12mm 14mm 24mm 14mm;
     background: url("v1/assets/mpstt-wave.png") no-repeat bottom center;
     background-size: 100% auto;
+    @bottom-center {
+      content: "{% if company.phone %}Contact: {{ company.phone }}{% endif %}{% if company.phone and company.website %}     |     {% endif %}{% if company.website %}Website: {{ company.website }}{% endif %}";
+      font-family: "Poppins", "DejaVu Sans", sans-serif;
+      font-size: 8.5pt;
+      font-weight: 600;
+      /* The wave is anchored to the bottom of the page area, leaving a
+         white strip beneath it — so this sits below the wave in brand teal,
+         not white-on-white over it. */
+      color: #075E59;
+      vertical-align: bottom;
+      padding-bottom: 7mm;
+    }
   }
   * { box-sizing: border-box; }
   body {
@@ -138,12 +150,6 @@
     </div>
   </div>
 
-  <div class="contact-strip">
-    {# Only the details that exist, so a missing one leaves no stray divider. #}
-    {%- for bit in [company.phone, company.email, company.website] if bit -%}
-      {{ bit }}{% if not loop.last %} &nbsp; | &nbsp; {% endif %}
-    {%- endfor -%}
-  </div>
 
   {% if customer.name %}
   <div class="party-grid">
